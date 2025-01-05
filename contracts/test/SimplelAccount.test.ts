@@ -29,9 +29,7 @@ describe("EmailAccountTest", () => {
     const [admin, owner] = await ethers.getSigners();
     const provider = new ethers.JsonRpcProvider("http://localhost:8545");
 
-    const bundlerProvider = new ethers.JsonRpcProvider(
-      process.env.BUNDLER === "unsafe" ? "http://localhost:3002/rpc" : "http://localhost:3000/rpc"
-    );
+    const bundlerProvider = new ethers.JsonRpcProvider("http://localhost:3000/rpc");
 
     // get list of supported entrypoints
     const entrypoints = await bundlerProvider.send(
@@ -56,11 +54,8 @@ describe("EmailAccountTest", () => {
   before(async () => {
     console.log("\n🚀 Initializing Simple Account Test Suite...");
 
-    const bundlerMode = process.env.BUNDLER === 'unsafe' ? '⚠️  UNSAFE' : '🔒 SAFE';
-    const bundlerPort = process.env.BUNDLER === 'unsafe' ? '3002' : '3000';
-
     console.log("\n🔧 Environment Configuration:");
-    console.log(`  ├─ BUNDLER: ${bundlerMode} (port ${bundlerPort})`);
+    console.log("  ├─ BUNDLER: 🔒 SAFE (port 3000)");
     console.log(`  └─ STAKE_ACCOUNT: ${process.env.STAKE_ACCOUNT || 'false'}`);
 
     context = await setupTests();
@@ -70,7 +65,7 @@ describe("EmailAccountTest", () => {
     console.log("  ├─ Owner Address:", await owner.getAddress());
     console.log("  ├─ Owner Balance:", ethers.formatEther(await context.provider.getBalance(await owner.getAddress())), "ETH");
     console.log("  ├─ EntryPoint:", context.entryPointAddress);
-    console.log(`  └─ Bundler URL: http://localhost:${bundlerPort}/rpc (${bundlerMode})`);
+    console.log("  └─ Bundler URL: http://localhost:3000/rpc (🔒 SAFE)");
 
     recipientAddress = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
     console.log("\n🔧 Deploying Contracts:");
