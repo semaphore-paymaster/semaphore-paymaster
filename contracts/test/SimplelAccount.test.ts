@@ -10,6 +10,7 @@ import sendUserOpAndWait, {
   getUserOpHash,
 } from "../scripts/utils/userOpUtils";
 import { expect } from "chai";
+import { Identity, Group, generateProof } from "@semaphore-protocol/core"
 
 describe("EmailAccountTest", () => {
   let context: {
@@ -26,13 +27,23 @@ describe("EmailAccountTest", () => {
   let simpleAccount: SimpleAccount;
   let simpleSemaphorePaymaster: SimpleSemaphorePaymaster;
   let verifier: SemaphoreVerifier;
-
+  let group: Group;
+  let groupId: number;
+  let id1: Identity;
+  let id2: Identity;
+  let id3: Identity;
   const transferAmount = ethers.parseEther("1");
 
   async function setupTests() {
-    const [admin, owner] = await ethers.getSigners();
-    const provider = new ethers.JsonRpcProvider("http://localhost:8545");
+    const [admin, owner, id1Pk, id2Pk, id3Pk] = await ethers.getSigners();
 
+    id1 = new Identity(id1Pk);
+    id2 = new Identity(id2Pk);
+    id3 = new Identity(id3Pk);
+    group = new Group([id1.commitment, id2.commitment, id3.commitment])
+    groupId = 0;
+
+    const provider = new ethers.JsonRpcProvider("http://localhost:8545");
     const bundlerProvider = new ethers.JsonRpcProvider("http://localhost:3000/rpc");
 
     // get list of supported entrypoints
@@ -55,7 +66,7 @@ describe("EmailAccountTest", () => {
     };
   }
 
-  before(async () => {
+  beforeEach(async () => {
     console.log("\n🚀 Initializing Simple Account Test Suite...");
 
     console.log("\n🔧 Environment Configuration:");
@@ -126,6 +137,21 @@ describe("EmailAccountTest", () => {
     await simpleSemaphorePaymaster.waitForDeployment();
     console.log("  └─ Simple Semaphore Paymaster deployed to:", await simpleSemaphorePaymaster.getAddress());
 
+    // create a group
+    await simpleSemaphorePaymaster["createGroup()"]()
+    await simpleSemaphorePaymaster.addMembers(groupId, group.members)
+    console.log("  └─ Group created with commitments:", group.members)
+
+    // deposit 0.01 ETH to the paymaster for the group
+    await simpleSemaphorePaymaster.depositForGroup(groupId, { value: ethers.parseEther("10") })
+    const deposit = await simpleSemaphorePaymaster.getDeposit()
+    console.log("  └─ Deposited", ethers.formatEther(deposit), "ETH to the paymaster for the group")
+
+
+    // add stake for the paymaster
+    await simpleSemaphorePaymaster.addStake(1, { value: ethers.parseEther("1") })
+    console.log("  └─ Staked ETH to the paymaster")
+
     console.log("\n✅ Setup Complete!\n");
   });
 
@@ -133,18 +159,41 @@ describe("EmailAccountTest", () => {
     await assertSendEth(transferAmount);
   });
 
-  it("should send 2 more eth twice", async () => {
-    await assertSendEth(ethers.parseEther("2"));
+  it("should send 2 more eth", async () => {
     await assertSendEth(ethers.parseEther("2"));
   });
 
   async function prepareUserOp(callData: string) {
+
+    const message = Math.floor(Math.random() * 1000000)
+    const proof = await generateProof(id1, group, message, groupId)
+
+    console.log("  └─ Proof:", proof)
+
+    const paymasterData = ethers.AbiCoder.defaultAbiCoder().encode(
+      ["tuple(uint256 groupId, tuple(uint256 merkleTreeDepth, uint256 merkleTreeRoot, uint256 nullifier, uint256 message, uint256 scope, uint256[8] points) proof)"],
+      [{
+        groupId: groupId,
+        proof: {
+          merkleTreeDepth: proof.merkleTreeDepth,
+          merkleTreeRoot: proof.merkleTreeRoot,
+          nullifier: proof.nullifier,
+          message: proof.message,
+          scope: proof.scope,
+          points: proof.points
+        }
+      }]
+    );
+
     const unsignedUserOperation = await generateUnsignedUserOp(
       context.entryPointAddress,
       context.provider,
       context.bundlerProvider,
       await simpleAccount.getAddress(),
-      callData
+      callData,
+      await simpleSemaphorePaymaster.getAddress(),
+      100000,
+      paymasterData
     );
     return await signUserOp(unsignedUserOperation);
   }
@@ -169,6 +218,8 @@ describe("EmailAccountTest", () => {
       recipientAddress
     );
 
+    console.log("  └─ Recipient Balance Before:", ethers.formatEther(recipientBalanceBefore), "ETH");
+
     const executeFunctionSelector = "0x" + ethers.id("execute(address,uint256,bytes)").slice(2, 10);
     const callData = executeFunctionSelector + ethers.AbiCoder.defaultAbiCoder().encode(
       ["address", "uint256", "bytes"],
@@ -181,9 +232,11 @@ describe("EmailAccountTest", () => {
       context.entryPointAddress,
       context.bundlerProvider
     );
+
     const recipientBalanceAfter = await context.provider.getBalance(
       recipientAddress
     );
+    console.log("  └─ Recipient Balance After:", ethers.formatEther(recipientBalanceAfter), "ETH");
     const expectedRecipientBalance = recipientBalanceBefore + amount;
     expect(recipientBalanceAfter).to.equal(expectedRecipientBalance);
   }

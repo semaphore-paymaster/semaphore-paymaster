@@ -9,6 +9,9 @@
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@nomicfoundation/hardhat-verify": "^2.0.0",
     "@nomicfoundation/ignition-core": "^0.15.5",
+    "@semaphore-protocol/core": "4.8.2",
+    "@semaphore-protocol/hardhat": "4.8.2",
+    "@semaphore-protocol/utils": "4.8.2",
     "@typechain/ethers-v5": "^11.1.2",
     "@typechain/ethers-v6": "^0.5.0",
     "@types/chai": "^4.2.0",
@@ -17,19 +20,17 @@
     "hardhat": "^2.22.11",
     "hardhat-gas-reporter": "^1.0.8",
     "ts-node": "^10.9.2",
-    "typechain": "^8.3.0",
-    "@semaphore-protocol/core": "4.8.2",
-    "@semaphore-protocol/hardhat": "4.8.2",
-    "@semaphore-protocol/utils": "4.8.2"
+    "typechain": "^8.3.0"
   },
   "dependencies": {
     "@account-abstraction": "https://github.com/eth-infinitism/account-abstraction",
     "@openzeppelin/contracts": "^5.0.2",
     "@openzeppelin/contracts-upgradeable": "^5.0.0",
-    "solady": "^0.0.123",
+    "@semaphore-protocol/contracts": "4.8.2",
+    "@semaphore-protocol/group": "^4.8.2",
     "@types/snarkjs": "^0.7.8",
     "dotenv": "^16.4.5",
     "snarkjs": "^0.7.4",
-    "@semaphore-protocol/contracts": "4.8.2"
+    "solady": "^0.0.123"
   }
 }

@@ -5,7 +5,6 @@ pragma solidity ^0.8.23;
 import "@account-abstraction/contracts/core/BasePaymaster.sol";
 import "@account-abstraction/contracts/core/Helpers.sol";
 import "@semaphore-protocol/contracts/Semaphore.sol";
-import "@semaphore-protocol/contracts/base/SemaphoreVerifier.sol";
 
 /**
  * @title SimpleSemaphorePaymaster
@@ -63,8 +62,7 @@ contract SimpleSemaphorePaymaster is BasePaymaster, Semaphore {
 
         // Check if group has sufficient balance
         require(groupDeposits[data.groupId] >= requiredPreFund, "Insufficient group balance");
-
-        // Verify the proof
+        // Verify the proof directly using data.proof
         if (this.verifyProof(data.groupId, data.proof)) {
             return (abi.encode(data), _packValidationData(false, 0, 0));
         }

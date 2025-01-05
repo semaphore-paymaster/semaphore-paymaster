@@ -794,7 +794,7 @@
     "@semaphore-protocol/identity" "4.8.2"
     "@semaphore-protocol/proof" "4.8.2"
 
-"@semaphore-protocol/group@4.8.2":
+"@semaphore-protocol/group@4.8.2", "@semaphore-protocol/group@^4.8.2":
   version "4.8.2"
   resolved "https://registry.yarnpkg.com/@semaphore-protocol/group/-/group-4.8.2.tgz#22e74eb587ae5c4644284479fcd2ca0d824dcc5a"
   integrity sha512-nhjcB3MP32lq47cBSyxVnOYE1P9p8a13rxUzJ51X2NVzqbjhpkM1FsPxPRe3bZRTJA3zG0u6Js0Ffydxa3lkng==
