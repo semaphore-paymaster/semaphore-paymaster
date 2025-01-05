@@ -1,0 +1,64 @@
+diff --git a/contracts/hardhat.config.ts b/contracts/hardhat.config.ts
+index 6d4a79c..bc6e88a 100644
+--- a/contracts/hardhat.config.ts
++++ b/contracts/hardhat.config.ts
+@@ -2,15 +2,8 @@ import { HardhatUserConfig } from "hardhat/config";
+ import "@nomicfoundation/hardhat-toolbox";
+ import "@nomicfoundation/hardhat-ethers";
+ import * as dotenv from "dotenv";
+-import fs from "fs";
+ dotenv.config();
+ 
+-// load tasks from tasks folder
+-const tasks = fs.readdirSync("./tasks").filter((file) => file.endsWith(".ts"));
+-tasks.forEach((task) => {
+-  require(`./tasks/${task}`);
+-});
+-
+ const { NODE_URL } = process.env;
+ 
+ const config: HardhatUserConfig = {
+diff --git a/docker-compose.yml b/docker-compose.yml
+index 913c9a3..c3b2716 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -21,39 +21,6 @@ services:
+       retries: 5
+       start_period: 30s
+ 
+-  bundler-unsafe:
+-    build:
+-      context: .
+-      dockerfile: Dockerfile.bundler
+-    ports:
+-      - "${BUNDLER_UNSAFE_PORT}:${BUNDLER_PORT}"
+-    command: [ "yarn", "run", "bundler", "--network", "http://node:${NODE_PORT}", "--unsafe", "--entryPoint", "0x0000000071727De22E5E9d8BAf0edAc6f37da032" ]
+-    depends_on:
+-      bundler:
+-        condition: service_healthy
+-      node:
+-        condition: service_started
+-    healthcheck:
+-      test: [ "CMD", "curl", "-f", "http://localhost:${BUNDLER_UNSAFE_PORT}/" ]
+-      interval: 1m30s
+-      timeout: 30s
+-      retries: 5
+-      start_period: 30s
+-
+-  contracts:
+-    build:
+-      context: ./contracts
+-      dockerfile: Dockerfile
+-    environment:
+-      - NODE_URL=http://node:${NODE_PORT}
+-      - BUNDLER_URL=http://bundler:${BUNDLER_PORT}/rpc
+-    command: [ "/bin/sh", "-c", "npx hardhat run scripts/deploy/deployEmailAccountFactory.ts --network dev" ]
+-    depends_on:
+-      bundler:
+-        condition: service_healthy
+-    volumes:
+-      - ./contracts/deployedAddresses:/usr/src/app/deployedAddresses
+-
+   scanner:
+     image: otterscan/otterscan:latest
+     ports:
