@@ -5,6 +5,7 @@ pragma solidity ^0.8.23;
 import "@account-abstraction/contracts/core/BasePaymaster.sol";
 import "@account-abstraction/contracts/core/Helpers.sol";
 import "@semaphore-protocol/contracts/Semaphore.sol";
+import "@semaphore-protocol/contracts/base/SemaphoreVerifier.sol";
 
 /**
  * @title SimpleSemaphorePaymaster
@@ -26,16 +27,6 @@ contract SimpleSemaphorePaymaster is BasePaymaster, Semaphore {
     mapping(uint256 => uint256) public groupDeposits;
 
     /**
-     * @notice Event emitted when funds are deposited for a group
-     */
-    event GroupDeposited(uint256 indexed groupId, uint256 amount);
-
-    /**
-     * @notice Event emitted when funds are withdrawn from a group
-     */
-    event GroupWithdrawn(uint256 indexed groupId, uint256 amount);
-
-    /**
      * @notice Constructs the paymaster with required parameters
      * @param _entryPoint The EntryPoint contract address
      * @param _verifier The Verifier contract address
@@ -46,14 +37,13 @@ contract SimpleSemaphorePaymaster is BasePaymaster, Semaphore {
     ) BasePaymaster(IEntryPoint(_entryPoint)) Semaphore(ISemaphoreVerifier(_verifier)) {}
 
     /**
-     * @notice Allows anyone to deposit funds for a specific group
+     * @notice Allows anyone to deposit funds for a specific group to be used for gas payment for members of the group
      * @param groupId The ID of the group to deposit for
      */
     function depositForGroup(uint256 groupId) external payable {
         require(msg.value > 0, "Must deposit non-zero amount");
         groupDeposits[groupId] += msg.value;
         this.deposit{value: msg.value}();
-        emit GroupDeposited(groupId, msg.value);
     }
 
     /**

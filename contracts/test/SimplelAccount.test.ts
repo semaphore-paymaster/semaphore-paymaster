@@ -1,7 +1,9 @@
 import { ethers } from "hardhat";
 import { JsonRpcProvider, Signer } from "ethers";
 import {
+  SemaphoreVerifier,
   SimpleAccount,
+  SimpleSemaphorePaymaster,
 } from "../typechain";
 import { generateUnsignedUserOp } from "../scripts/utils/userOpUtils";
 import sendUserOpAndWait, {
@@ -22,6 +24,8 @@ describe("EmailAccountTest", () => {
   let recipient: Signer;
   let recipientAddress: string;
   let simpleAccount: SimpleAccount;
+  let simpleSemaphorePaymaster: SimpleSemaphorePaymaster;
+  let verifier: SemaphoreVerifier;
 
   const transferAmount = ethers.parseEther("1");
 
@@ -100,6 +104,27 @@ describe("EmailAccountTest", () => {
       console.log("\nℹ️  Stake Status:");
       console.log("  └─ Skipping account staking (STAKE_ACCOUNT not set)");
     }
+
+
+    console.log("\n🔧 Deploying Semaphore Contracts:");
+
+    const poseidonT3Factory = await ethers.getContractFactory("PoseidonT3");
+    const poseidonT3 = await poseidonT3Factory.deploy();
+    await poseidonT3.waitForDeployment();
+    console.log("  └─ PoseidonT3 deployed to:", await poseidonT3.getAddress());
+
+    const verifierFactory = await ethers.getContractFactory("SemaphoreVerifier");
+    verifier = await verifierFactory.deploy();
+    await verifier.waitForDeployment();
+    console.log("  └─ Semaphore Verifier deployed to:", await verifier.getAddress());
+    const simpleSemaphorePaymasterFactory = await ethers.getContractFactory("SimpleSemaphorePaymaster", {
+      libraries: {
+        PoseidonT3: await poseidonT3.getAddress()
+      }
+    });
+    simpleSemaphorePaymaster = await simpleSemaphorePaymasterFactory.deploy(context.entryPointAddress, await verifier.getAddress());
+    await simpleSemaphorePaymaster.waitForDeployment();
+    console.log("  └─ Simple Semaphore Paymaster deployed to:", await simpleSemaphorePaymaster.getAddress());
 
     console.log("\n✅ Setup Complete!\n");
   });
