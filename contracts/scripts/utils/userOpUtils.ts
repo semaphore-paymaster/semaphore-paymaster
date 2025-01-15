@@ -284,7 +284,6 @@ export const createUserOperation = async (
   );
 
   const nonce = await entryPoint.getNonce(accountAddress, "0x00");
-  console.log("  └─ Nonce:", nonce)
   const nonceHex = "0x0" + nonce.toString();
 
   let userOp: Partial<UserOperation> = {
