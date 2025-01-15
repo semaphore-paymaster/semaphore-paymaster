@@ -7,7 +7,7 @@ import {
 import { expect } from "chai";
 import { Identity, Group } from "@semaphore-protocol/core"
 import { setupProviders, setupSimpleAccount, setupSemaphoreContracts, generateMessage, generatePaymasterData, prepareTransferCallData, prepareUserOp, TestContext } from "./utils/testUtils";
-import sendUserOpAndWait from "../scripts/utils/userOpUtils";
+import sendUserOpAndWait from "./utils/userOpUtils";
 
 const ENABLE_LOGS = false; // Toggle this to enable/disable logging
 const log = (...args: any[]) => ENABLE_LOGS && console.log(...args);
