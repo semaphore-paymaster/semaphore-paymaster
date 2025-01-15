@@ -1,6 +1,13 @@
-# ERC4337 Smart Account Development Template
+# ERC4337 Semaphore Paymaster
 
-This Porject provides a template for developing ERC4337 Smart Accounts. With an integrated bundler for testing.
+A privacy-preserving paymaster implementation using Semaphore Protocol for ERC4337 Account Abstraction. This paymaster allows users to pay for gas using zero-knowledge proofs of membership in a Semaphore group.
+
+## 🔒 Features
+
+- Privacy-preserving gas sponsorship using zero-knowledge proofs
+- Group-based access control for gas payments
+- Integration with Semaphore Protocol for membership verification
+- Compatible with ERC4337 Account Abstraction standard
 
 ## 🚀 Quick Start
 
@@ -11,7 +18,7 @@ This Porject provides a template for developing ERC4337 Smart Accounts. With an 
 
 ### Setup
 
-0. Setup environment variables:
+1. Setup environment variables:
 
    ```bash
    cp .env.example .env
@@ -19,22 +26,19 @@ This Porject provides a template for developing ERC4337 Smart Accounts. With an 
 
    Edit `.env` with your desired settings.
 
-1. Start the local blockchain node and bundler:
+2. Start the local blockchain node and bundler:
 
    > Note: This step is not required if you only want to run unit tests. See testing instructions below.
-
 
    ```bash
    docker compose up --build
    ```
 
-2. Open a new terminal and install contract dependencies and setup environment variables (the default values should work for most users):
+3. Open a new terminal and install contract dependencies:
 
    ```bash
    cd contracts && yarn && cp .env.example .env
    ```
-
-## 🧪 Testing (Optional)
 
 ### unit tests
 
