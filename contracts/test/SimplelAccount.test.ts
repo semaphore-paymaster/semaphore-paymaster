@@ -1,30 +1,20 @@
 import { ethers } from "hardhat";
-import { JsonRpcProvider, Signer } from "ethers";
+import { Signer } from "ethers";
 import {
   SimpleAccount,
   SimpleSemaphorePaymaster,
 } from "../typechain";
-import { generateUnsignedUserOp } from "../scripts/utils/userOpUtils";
-import sendUserOpAndWait, {
-  getUserOpHash,
-} from "../scripts/utils/userOpUtils";
 import { expect } from "chai";
-import { Identity, Group, generateProof } from "@semaphore-protocol/core"
+import { Identity, Group } from "@semaphore-protocol/core"
+import { setupProviders, setupSimpleAccount, setupSemaphoreContracts, generateMessage, generatePaymasterData, prepareTransferCallData, prepareUserOp, TestContext } from "./utils/testUtils";
+import sendUserOpAndWait from "../scripts/utils/userOpUtils";
 
 const ENABLE_LOGS = false; // Toggle this to enable/disable logging
 const log = (...args: any[]) => ENABLE_LOGS && console.log(...args);
 
 describe("SimplePaymasterTest", () => {
-  let context: {
-    bundlerProvider: JsonRpcProvider;
-    provider: JsonRpcProvider;
-    admin: Signer;
-    owner: Signer;
-    entryPointAddress: string;
-  };
-
+  let context: TestContext;
   let owner: Signer;
-  let recipient: Signer;
   let recipientAddress: string;
   let simpleAccount: SimpleAccount;
   let simpleSemaphorePaymaster: SimpleSemaphorePaymaster;
@@ -34,27 +24,6 @@ describe("SimplePaymasterTest", () => {
   let id2: Identity;
   let id3: Identity;
   const transferAmount = ethers.parseEther("1");
-
-  async function setupProviders() {
-    const provider = new ethers.JsonRpcProvider("http://localhost:8545");
-    const bundlerProvider = new ethers.JsonRpcProvider("http://localhost:3000/rpc");
-
-    // get list of supported entrypoints
-    const entrypoints = await bundlerProvider.send(
-      "eth_supportedEntryPoints",
-      []
-    );
-
-    if (entrypoints.length === 0) {
-      throw new Error("No entrypoints found");
-    }
-
-    return {
-      provider,
-      bundlerProvider,
-      entryPointAddress: entrypoints[0]
-    };
-  }
 
   async function setupIdentities() {
     const [admin, owner, id1Pk, id2Pk, id3Pk] = await ethers.getSigners();
@@ -66,95 +35,6 @@ describe("SimplePaymasterTest", () => {
     groupId = 0;
 
     return { admin, owner };
-  }
-
-  async function setupSimpleAccount(entryPointAddress: string) {
-    const factory = await ethers.getContractFactory("SimpleAccountFactory");
-    const simpleAccountFactory = await factory.deploy(entryPointAddress);
-    await simpleAccountFactory.waitForDeployment();
-    log("  └─ Simple Account Factory deployed to:", await simpleAccountFactory.getAddress());
-
-    const salt = ethers.randomBytes(32);
-    await simpleAccountFactory.createSimpleAccount(salt);
-    const account = await ethers.getContractAt("SimpleAccount", await simpleAccountFactory.computeAddress(salt));
-    log("  └─ Simple Account created at:", await account.getAddress());
-
-    return account;
-  }
-
-  async function setupSemaphoreContracts(entryPointAddress: string) {
-    // Deploy PoseidonT3
-    const poseidonT3Factory = await ethers.getContractFactory("PoseidonT3");
-    const poseidonT3 = await poseidonT3Factory.deploy();
-    await poseidonT3.waitForDeployment();
-    log("  └─ PoseidonT3 deployed to:", await poseidonT3.getAddress());
-
-    // Deploy Verifier
-    const verifierFactory = await ethers.getContractFactory("AlwaysValidVerifier");
-    const verifierContract = await verifierFactory.deploy();
-    await verifierContract.waitForDeployment();
-    log("  └─ Semaphore Verifier deployed to:", await verifierContract.getAddress());
-
-    // Deploy Paymaster
-    const simpleSemaphorePaymasterFactory = await ethers.getContractFactory("SimpleSemaphorePaymaster", {
-      libraries: {
-        PoseidonT3: await poseidonT3.getAddress()
-      }
-    });
-    const paymaster = await simpleSemaphorePaymasterFactory.deploy(entryPointAddress, await verifierContract.getAddress());
-    await paymaster.waitForDeployment();
-    log("  └─ Simple Semaphore Paymaster deployed to:", await paymaster.getAddress());
-
-    return paymaster;
-  }
-
-
-  async function generateMessage(account: SimpleAccount) {
-    // the message is keccak256(abi.encode(sender, nonce))
-    const nonce = await simpleAccount.getNonce();
-    log("  └─ Nonce:", nonce)
-    const sender = await account.getAddress();
-    const encoded = ethers.AbiCoder.defaultAbiCoder().encode(["address", "uint256"], [sender, nonce]);
-    const hash = ethers.keccak256(encoded);
-    return BigInt(hash);
-  }
-
-  async function generatePaymasterData(id: Identity, group: Group, message: bigint, groupId: number) {
-    const proof = await generateProof(id, group, message, groupId)
-    return ethers.AbiCoder.defaultAbiCoder().encode(
-      ["tuple(uint256 groupId, tuple(uint256 merkleTreeDepth, uint256 merkleTreeRoot, uint256 nullifier, uint256 message, uint256 scope, uint256[8] points) proof)"],
-      [{ groupId: groupId, proof }]
-    );
-  }
-
-  async function prepareUserOp(callData: string, paymasterData: string) {
-
-    const unsignedUserOperation = await generateUnsignedUserOp(
-      context.entryPointAddress,
-      context.provider,
-      context.bundlerProvider,
-      await simpleAccount.getAddress(),
-      callData,
-      await simpleSemaphorePaymaster.getAddress(),
-      100000,
-      paymasterData
-    );
-    return await signUserOp(unsignedUserOperation);
-  }
-
-  async function signUserOp(unsignedUserOperation: any) {
-    const chainId = await context.provider
-      .getNetwork()
-      .then((network) => network.chainId);
-    const userOpHash = getUserOpHash(
-      unsignedUserOperation,
-      context.entryPointAddress,
-      Number(chainId)
-    );
-
-    unsignedUserOperation.signature = "0x"; // everything is valid in our test account.
-
-    return unsignedUserOperation;
   }
 
   async function assertSendEth(
@@ -170,7 +50,7 @@ describe("SimplePaymasterTest", () => {
     const callData = prepareTransferCallData(recipientAddress, amount);
 
     // Create and send user operation
-    const userOp = await prepareUserOp(callData, paymasterData);
+    const userOp = await prepareUserOp(context, callData, await simpleAccount.getAddress(), await simpleSemaphorePaymaster.getAddress(), paymasterData);
 
     if (shouldSucceed) {
       await assertSuccessfulTransfer(
@@ -181,14 +61,6 @@ describe("SimplePaymasterTest", () => {
     } else {
       await assertFailedTransfer(userOp);
     }
-  }
-
-  function prepareTransferCallData(to: string, amount: bigint): string {
-    const executeFunctionSelector = "0x" + ethers.id("execute(address,uint256,bytes)").slice(2, 10);
-    return executeFunctionSelector + ethers.AbiCoder.defaultAbiCoder().encode(
-      ["address", "uint256", "bytes"],
-      [to, amount, "0x"]
-    ).slice(2);
   }
 
   async function assertSuccessfulTransfer(
@@ -230,7 +102,7 @@ describe("SimplePaymasterTest", () => {
 
     // Setup identities and signers
     const { admin, owner: setupOwner } = await setupIdentities();
-    [owner, recipient] = await ethers.getSigners();
+    [owner] = await ethers.getSigners();
 
     context = {
       bundlerProvider,
@@ -366,7 +238,10 @@ describe("SimplePaymasterTest", () => {
 
     // Send transaction and track gas usage
     const userOp = await prepareUserOp(
+      context,
       prepareTransferCallData(recipientAddress, transferAmount),
+      await simpleAccount.getAddress(),
+      await simpleSemaphorePaymaster.getAddress(),
       paymasterData
     );
     const receipt = await sendUserOpAndWait(
