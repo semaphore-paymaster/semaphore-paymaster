@@ -153,25 +153,35 @@ describe("SimplePaymasterTest", () => {
   });
 
   it("should execute a simple ETH transfer", async () => {
-    const message = BigInt(await simpleAccount.getAddress()) & ((1n << 256n) - 1n)
+    const message = await generateMessage(simpleAccount)
     const paymasterData = await generatePaymasterData(id1, group, message, groupId)
     console.log("  └─ Paymaster Data:", paymasterData)
     await assertSendEth(transferAmount, paymasterData);
   });
 
   it("should send 2 more eth", async () => {
-    const message = BigInt(await simpleAccount.getAddress()) & ((1n << 256n) - 1n)
+    const message = await generateMessage(simpleAccount)
     const paymasterData = await generatePaymasterData(id1, group, message, groupId)
     console.log("  └─ Paymaster Data:", paymasterData)
     await assertSendEth(ethers.parseEther("2"), paymasterData);
   });
 
   it("should not allow proof reuse", async () => {
-    const message = BigInt(await simpleAccount.getAddress()) & ((1n << 256n) - 1n)
+    const message = await generateMessage(simpleAccount)
     const paymasterData = await generatePaymasterData(id1, group, message, groupId)
     await assertSendEth(ethers.parseEther("2"), paymasterData, true); // first time should succeed
     await assertSendEth(ethers.parseEther("2"), paymasterData, false); // second time should fail
   });
+
+  async function generateMessage(account: SimpleAccount) {
+    // the message is keccak256(abi.encode(sender, nonce))
+    const nonce = await simpleAccount.getNonce();
+    console.log("  └─ Nonce:", nonce)
+    const sender = await account.getAddress();
+    const encoded = ethers.AbiCoder.defaultAbiCoder().encode(["address", "uint256"], [sender, nonce]);
+    const hash = ethers.keccak256(encoded);
+    return BigInt(hash);
+  }
 
   async function generatePaymasterData(id: Identity, group: Group, message: bigint, groupId: number) {
     const proof = await generateProof(id, group, message, groupId)
@@ -211,38 +221,65 @@ describe("SimplePaymasterTest", () => {
     return unsignedUserOperation;
   }
 
-  async function assertSendEth(amount: bigint, paymasterData: string = "0x", shouldSucceed: boolean = true) {
-    const recipientBalanceBefore = await context.provider.getBalance(
-      recipientAddress
-    );
-
+  async function assertSendEth(
+    amount: bigint,
+    paymasterData: string = "0x",
+    shouldSucceed: boolean = true
+  ) {
+    // Get initial balance
+    const recipientBalanceBefore = await context.provider.getBalance(recipientAddress);
     console.log("  └─ Recipient Balance Before:", ethers.formatEther(recipientBalanceBefore), "ETH");
 
-    const executeFunctionSelector = "0x" + ethers.id("execute(address,uint256,bytes)").slice(2, 10);
-    const callData = executeFunctionSelector + ethers.AbiCoder.defaultAbiCoder().encode(
-      ["address", "uint256", "bytes"],
-      [recipientAddress, amount, "0x"]
-    ).slice(2);
+    // Prepare call data for ETH transfer
+    const callData = prepareTransferCallData(recipientAddress, amount);
 
+    // Create and send user operation
     const userOp = await prepareUserOp(callData, paymasterData);
+
+    if (shouldSucceed) {
+      await assertSuccessfulTransfer(
+        userOp,
+        recipientBalanceBefore,
+        amount
+      );
+    } else {
+      await assertFailedTransfer(userOp);
+    }
+  }
+
+  function prepareTransferCallData(to: string, amount: bigint): string {
+    const executeFunctionSelector = "0x" + ethers.id("execute(address,uint256,bytes)").slice(2, 10);
+    return executeFunctionSelector + ethers.AbiCoder.defaultAbiCoder().encode(
+      ["address", "uint256", "bytes"],
+      [to, amount, "0x"]
+    ).slice(2);
+  }
+
+  async function assertSuccessfulTransfer(
+    userOp: any,
+    balanceBefore: bigint,
+    amount: bigint
+  ) {
     const receipt = await sendUserOpAndWait(
       userOp,
       context.entryPointAddress,
       context.bundlerProvider
     );
 
-    const recipientBalanceAfter = await context.provider.getBalance(
-      recipientAddress
-    );
-    console.log("  └─ Recipient Balance After:", ethers.formatEther(recipientBalanceAfter), "ETH");
+    const balanceAfter = await context.provider.getBalance(recipientAddress);
+    console.log("  └─ Recipient Balance After:", ethers.formatEther(balanceAfter), "ETH");
 
-    if (shouldSucceed) {
-      expect(receipt.success).to.be.true;
-      const expectedRecipientBalance = recipientBalanceBefore + amount;
-      expect(recipientBalanceAfter).to.equal(expectedRecipientBalance);
-    } else {
-      expect(receipt.success).to.be.false;
-      expect(recipientBalanceAfter).to.equal(recipientBalanceBefore);
-    }
+    expect(receipt.success).to.be.true;
+    expect(balanceAfter).to.equal(balanceBefore + amount);
+  }
+
+  async function assertFailedTransfer(userOp: any) {
+    await expect(
+      sendUserOpAndWait(
+        userOp,
+        context.entryPointAddress,
+        context.bundlerProvider
+      )
+    ).to.be.rejected;
   }
 });
