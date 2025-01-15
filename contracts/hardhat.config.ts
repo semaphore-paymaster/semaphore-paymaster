@@ -14,6 +14,9 @@ const config: HardhatUserConfig = {
       url: NODE_URL,
     },
   },
+  paths: {
+    sources: "./src"
+  }
 };
 
 export default config;

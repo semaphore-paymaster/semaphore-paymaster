@@ -2,8 +2,8 @@
 pragma solidity ^0.8.13;
 
 import {Test, console} from "forge-std/Test.sol";
-import {SimpleSemaphorePaymaster} from "../../contracts/SimpleSemaphorePaymaster.sol";
-import {AlwaysValidVerifier} from "../../contracts/mocks/AlwaysValidVerifier.sol";
+import {SimpleSemaphorePaymaster} from "../../src/SimpleSemaphorePaymaster.sol";
+import {AlwaysValidVerifier} from "../../src/mocks/AlwaysValidVerifier.sol";
 import {EntryPoint} from "@account-abstraction/contracts/core/EntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.sol";
