@@ -62,10 +62,15 @@ contract SimpleSemaphorePaymaster is BasePaymaster, Semaphore {
 
         // message must be keccak256(abi.encode(sender, nonce))
         uint256 expectedMessage = uint256(keccak256(abi.encode(userOp.sender, userOp.nonce)));
-        require(data.proof.message == expectedMessage, "Invalid message");
+        if (data.proof.message != expectedMessage) {
+            return ("", _packValidationData(true, 0, 0));
+        }
 
         // Check if group has sufficient balance
-        require(groupDeposits[data.groupId] >= requiredPreFund, "Insufficient group balance");
+        if (groupDeposits[data.groupId] < requiredPreFund) {
+            return ("", _packValidationData(true, 0, 0));
+        }
+
         // Verify the proof directly using data.proof
         if (this.verifyProof(data.groupId, data.proof)) {
             return (abi.encode(data), _packValidationData(false, 0, 0));
