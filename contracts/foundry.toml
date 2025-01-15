@@ -1,0 +1,17 @@
+[profile.default]
+src = "contracts"
+out = "artifacts"
+libs = ["node_modules", "lib"]
+remappings = [
+    "@account-abstraction/=node_modules/@account-abstraction/",
+    "@openzeppelin/=node_modules/@openzeppelin/",
+    "@semaphore-protocol/=node_modules/@semaphore-protocol/",
+    "@zk-kit/=node_modules/@zk-kit/",
+    "eth-gas-reporter/=node_modules/eth-gas-reporter/",
+    "hardhat-deploy/=node_modules/hardhat-deploy/",
+    "hardhat/=node_modules/hardhat/",
+    "poseidon-solidity/=node_modules/poseidon-solidity/",
+    "solady/=node_modules/solady/",
+]
+
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

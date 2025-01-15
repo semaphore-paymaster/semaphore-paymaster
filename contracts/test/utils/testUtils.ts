@@ -2,8 +2,8 @@ import { ethers } from "hardhat";
 import { JsonRpcProvider, Signer } from "ethers";
 import { SimpleAccount, SimpleSemaphorePaymaster } from "../../typechain";
 import { Identity, Group, generateProof } from "@semaphore-protocol/core";
-import { generateUnsignedUserOp, getUserOpHash } from "../../scripts/utils/userOpUtils";
-import sendUserOpAndWait from "../../scripts/utils/userOpUtils";
+import { generateUnsignedUserOp, getUserOpHash } from "./userOpUtils";
+import sendUserOpAndWait from "./userOpUtils";
 
 export interface TestContext {
     bundlerProvider: JsonRpcProvider;

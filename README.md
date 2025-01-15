@@ -21,6 +21,9 @@ This Porject provides a template for developing ERC4337 Smart Accounts. With an 
 
 1. Start the local blockchain node and bundler:
 
+   > Note: This step is not required if you only want to run unit tests. See testing instructions below.
+
+
    ```bash
    docker compose up --build
    ```
@@ -33,7 +36,13 @@ This Porject provides a template for developing ERC4337 Smart Accounts. With an 
 
 ## 🧪 Testing (Optional)
 
-Run the smart contract tests:
+### unit tests
+
+```bash
+forge test
+```
+
+### integration tests
 ```bash
 npx hardhat test --network dev
 ```
