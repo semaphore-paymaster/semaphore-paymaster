@@ -1,7 +1,6 @@
 import { ethers } from "hardhat";
 import { JsonRpcProvider, Signer } from "ethers";
 import {
-  SemaphoreVerifier,
   SimpleAccount,
   SimpleSemaphorePaymaster,
 } from "../typechain";
@@ -26,7 +25,6 @@ describe("SimplePaymasterTest", () => {
   let recipientAddress: string;
   let simpleAccount: SimpleAccount;
   let simpleSemaphorePaymaster: SimpleSemaphorePaymaster;
-  let verifier: SemaphoreVerifier;
   let group: Group;
   let groupId: number;
   let id1: Identity;
@@ -123,16 +121,16 @@ describe("SimplePaymasterTest", () => {
     await poseidonT3.waitForDeployment();
     console.log("  └─ PoseidonT3 deployed to:", await poseidonT3.getAddress());
 
-    const verifierFactory = await ethers.getContractFactory("SemaphoreVerifier");
-    verifier = await verifierFactory.deploy();
-    await verifier.waitForDeployment();
-    console.log("  └─ Semaphore Verifier deployed to:", await verifier.getAddress());
+    const verifierFactory = await ethers.getContractFactory("AlwaysValidVerifier");
+    const verifierContract = await verifierFactory.deploy();
+    await verifierContract.waitForDeployment();
+    console.log("  └─ Semaphore Verifier deployed to:", await verifierContract.getAddress());
     const simpleSemaphorePaymasterFactory = await ethers.getContractFactory("SimpleSemaphorePaymaster", {
       libraries: {
         PoseidonT3: await poseidonT3.getAddress()
       }
     });
-    simpleSemaphorePaymaster = await simpleSemaphorePaymasterFactory.deploy(context.entryPointAddress, await verifier.getAddress());
+    simpleSemaphorePaymaster = await simpleSemaphorePaymasterFactory.deploy(context.entryPointAddress, await verifierContract.getAddress());
     await simpleSemaphorePaymaster.waitForDeployment();
     console.log("  └─ Simple Semaphore Paymaster deployed to:", await simpleSemaphorePaymaster.getAddress());
 
