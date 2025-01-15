@@ -166,6 +166,13 @@ describe("SimplePaymasterTest", () => {
     await assertSendEth(ethers.parseEther("2"), paymasterData);
   });
 
+  it("should not allow proof reuse", async () => {
+    const message = BigInt(await simpleAccount.getAddress()) & ((1n << 256n) - 1n)
+    const paymasterData = await generatePaymasterData(id1, group, message, groupId)
+    await assertSendEth(ethers.parseEther("2"), paymasterData, true); // first time should succeed
+    await assertSendEth(ethers.parseEther("2"), paymasterData, false); // second time should fail
+  });
+
   async function generatePaymasterData(id: Identity, group: Group, message: bigint, groupId: number) {
     const proof = await generateProof(id, group, message, groupId)
     return ethers.AbiCoder.defaultAbiCoder().encode(
@@ -204,7 +211,7 @@ describe("SimplePaymasterTest", () => {
     return unsignedUserOperation;
   }
 
-  async function assertSendEth(amount: bigint, paymasterData: string = "0x") {
+  async function assertSendEth(amount: bigint, paymasterData: string = "0x", shouldSucceed: boolean = true) {
     const recipientBalanceBefore = await context.provider.getBalance(
       recipientAddress
     );
@@ -218,7 +225,7 @@ describe("SimplePaymasterTest", () => {
     ).slice(2);
 
     const userOp = await prepareUserOp(callData, paymasterData);
-    await sendUserOpAndWait(
+    const receipt = await sendUserOpAndWait(
       userOp,
       context.entryPointAddress,
       context.bundlerProvider
@@ -228,7 +235,14 @@ describe("SimplePaymasterTest", () => {
       recipientAddress
     );
     console.log("  └─ Recipient Balance After:", ethers.formatEther(recipientBalanceAfter), "ETH");
-    const expectedRecipientBalance = recipientBalanceBefore + amount;
-    expect(recipientBalanceAfter).to.equal(expectedRecipientBalance);
+
+    if (shouldSucceed) {
+      expect(receipt.success).to.be.true;
+      const expectedRecipientBalance = recipientBalanceBefore + amount;
+      expect(recipientBalanceAfter).to.equal(expectedRecipientBalance);
+    } else {
+      expect(receipt.success).to.be.false;
+      expect(recipientBalanceAfter).to.equal(recipientBalanceBefore);
+    }
   }
 });
