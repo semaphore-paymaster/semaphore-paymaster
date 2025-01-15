@@ -155,34 +155,28 @@ describe("SimplePaymasterTest", () => {
   });
 
   it("should execute a simple ETH transfer", async () => {
-    await assertSendEth(transferAmount);
+    const message = BigInt(await simpleAccount.getAddress()) & ((1n << 256n) - 1n)
+    const paymasterData = await generatePaymasterData(id1, group, message, groupId)
+    console.log("  └─ Paymaster Data:", paymasterData)
+    await assertSendEth(transferAmount, paymasterData);
   });
 
   it("should send 2 more eth", async () => {
-    await assertSendEth(ethers.parseEther("2"));
+    const message = BigInt(await simpleAccount.getAddress()) & ((1n << 256n) - 1n)
+    const paymasterData = await generatePaymasterData(id1, group, message, groupId)
+    console.log("  └─ Paymaster Data:", paymasterData)
+    await assertSendEth(ethers.parseEther("2"), paymasterData);
   });
 
-  async function prepareUserOp(callData: string) {
-
-    const message = Math.floor(Math.random() * 1000000)
-    const proof = await generateProof(id1, group, message, groupId)
-
-    console.log("  └─ Proof:", proof)
-
-    const paymasterData = ethers.AbiCoder.defaultAbiCoder().encode(
+  async function generatePaymasterData(id: Identity, group: Group, message: bigint, groupId: number) {
+    const proof = await generateProof(id, group, message, groupId)
+    return ethers.AbiCoder.defaultAbiCoder().encode(
       ["tuple(uint256 groupId, tuple(uint256 merkleTreeDepth, uint256 merkleTreeRoot, uint256 nullifier, uint256 message, uint256 scope, uint256[8] points) proof)"],
-      [{
-        groupId: groupId,
-        proof: {
-          merkleTreeDepth: proof.merkleTreeDepth,
-          merkleTreeRoot: proof.merkleTreeRoot,
-          nullifier: proof.nullifier,
-          message: proof.message,
-          scope: proof.scope,
-          points: proof.points
-        }
-      }]
+      [{ groupId: groupId, proof }]
     );
+  }
+
+  async function prepareUserOp(callData: string, paymasterData: string) {
 
     const unsignedUserOperation = await generateUnsignedUserOp(
       context.entryPointAddress,
@@ -207,12 +201,12 @@ describe("SimplePaymasterTest", () => {
       Number(chainId)
     );
 
-    unsignedUserOperation.signature = "0x"; // everything is valid so far.
+    unsignedUserOperation.signature = "0x"; // everything is valid in our test account.
 
     return unsignedUserOperation;
   }
 
-  async function assertSendEth(amount: bigint) {
+  async function assertSendEth(amount: bigint, paymasterData: string = "0x") {
     const recipientBalanceBefore = await context.provider.getBalance(
       recipientAddress
     );
@@ -225,7 +219,7 @@ describe("SimplePaymasterTest", () => {
       [recipientAddress, amount, "0x"]
     ).slice(2);
 
-    const userOp = await prepareUserOp(callData);
+    const userOp = await prepareUserOp(callData, paymasterData);
     await sendUserOpAndWait(
       userOp,
       context.entryPointAddress,

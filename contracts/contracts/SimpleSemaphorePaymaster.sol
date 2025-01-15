@@ -60,6 +60,8 @@ contract SimpleSemaphorePaymaster is BasePaymaster, Semaphore {
         // Extract and decode the paymaster data
         PaymasterData memory data = abi.decode(userOp.paymasterAndData[52:], (PaymasterData));
 
+        require(userOp.sender == address(uint160(data.proof.message)), "Invalid sender");
+
         // Check if group has sufficient balance
         require(groupDeposits[data.groupId] >= requiredPreFund, "Insufficient group balance");
         // Verify the proof directly using data.proof
