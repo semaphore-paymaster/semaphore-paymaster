@@ -14,8 +14,8 @@ export interface TestContext {
 }
 
 export async function setupProviders() {
-    const provider = new ethers.JsonRpcProvider("http://localhost:8545");
-    const bundlerProvider = new ethers.JsonRpcProvider("http://localhost:3000/rpc");
+    const provider = new ethers.JsonRpcProvider(process.env.NODE_URL);
+    const bundlerProvider = new ethers.JsonRpcProvider(process.env.BUNDLER_URL);
 
     const entrypoints = await bundlerProvider.send("eth_supportedEntryPoints", []);
 
