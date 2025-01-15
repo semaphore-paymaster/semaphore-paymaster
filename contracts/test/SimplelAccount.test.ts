@@ -35,15 +35,7 @@ describe("SimplePaymasterTest", () => {
   let id3: Identity;
   const transferAmount = ethers.parseEther("1");
 
-  async function setupTests() {
-    const [admin, owner, id1Pk, id2Pk, id3Pk] = await ethers.getSigners();
-
-    id1 = new Identity(id1Pk);
-    id2 = new Identity(id2Pk);
-    id3 = new Identity(id3Pk);
-    group = new Group([id1.commitment, id2.commitment, id3.commitment])
-    groupId = 0;
-
+  async function setupProviders() {
     const provider = new ethers.JsonRpcProvider("http://localhost:8545");
     const bundlerProvider = new ethers.JsonRpcProvider("http://localhost:3000/rpc");
 
@@ -58,190 +50,64 @@ describe("SimplePaymasterTest", () => {
     }
 
     return {
-      bundlerProvider,
       provider,
-      admin,
-      owner,
-      recipient,
-      entryPointAddress: entrypoints[0],
+      bundlerProvider,
+      entryPointAddress: entrypoints[0]
     };
   }
 
-  beforeEach(async () => {
+  async function setupIdentities() {
+    const [admin, owner, id1Pk, id2Pk, id3Pk] = await ethers.getSigners();
 
-    log("\n🚀 Initializing Simple Account Test Suite...");
-    log("\n🔧 Environment Configuration:");
-    log("  ├─ BUNDLER: 🔒 SAFE (port 3000)");
-    log(`  └─ STAKE_ACCOUNT: ${process.env.STAKE_ACCOUNT || 'false'}`);
+    id1 = new Identity(id1Pk);
+    id2 = new Identity(id2Pk);
+    id3 = new Identity(id3Pk);
+    group = new Group([id1.commitment, id2.commitment, id3.commitment]);
+    groupId = 0;
 
-    context = await setupTests();
-    [owner, recipient] = await ethers.getSigners();
+    return { admin, owner };
+  }
 
-    log("\n📋 Test Configuration:");
-    log("  ├─ Owner Address:", await owner.getAddress());
-    log("  ├─ Owner Balance:", ethers.formatEther(await context.provider.getBalance(await owner.getAddress())), "ETH");
-    log("  ├─ EntryPoint:", context.entryPointAddress);
-    log("  └─ Bundler URL: http://localhost:3000/rpc (🔒 SAFE)");
-
-    recipientAddress = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
-    log("\n🔧 Deploying Contracts:");
-
+  async function setupSimpleAccount(entryPointAddress: string) {
     const factory = await ethers.getContractFactory("SimpleAccountFactory");
-    const simpleAccountFactory = await factory.deploy(context.entryPointAddress);
+    const simpleAccountFactory = await factory.deploy(entryPointAddress);
     await simpleAccountFactory.waitForDeployment();
     log("  └─ Simple Account Factory deployed to:", await simpleAccountFactory.getAddress());
 
-    log("\n📬 Creating Simple Account:");
     const salt = ethers.randomBytes(32);
     await simpleAccountFactory.createSimpleAccount(salt);
-    simpleAccount = await ethers.getContractAt("SimpleAccount", await simpleAccountFactory.computeAddress(salt));
-    log("  └─ Simple Account created at:", await simpleAccount.getAddress());
+    const account = await ethers.getContractAt("SimpleAccount", await simpleAccountFactory.computeAddress(salt));
+    log("  └─ Simple Account created at:", await account.getAddress());
 
-    // fund the account from owner's account
-    const fundingAmount = ethers.parseEther("1000");
-    log("\n💰 Funding Account:");
-    log("  └─ Sending", ethers.formatEther(fundingAmount), "ETH to Simple Account");
-    await owner.sendTransaction({
-      to: await simpleAccount.getAddress(),
-      value: fundingAmount
-    });
+    return account;
+  }
 
-    // Only add stake if STAKE_ACCOUNT environment variable is set to true
-    if (process.env.STAKE_ACCOUNT === 'true') {
-      log("\n🔒 Adding Stake:");
-      log("  └─ Staking 1 ETH to account");
-      await simpleAccount.addStake(1, { value: ethers.parseEther("1") });
-    } else {
-      log("\nℹ️  Stake Status:");
-      log("  └─ Skipping account staking (STAKE_ACCOUNT not set)");
-    }
-
-    log("\n🔧 Deploying Semaphore Contracts:");
-
+  async function setupSemaphoreContracts(entryPointAddress: string) {
+    // Deploy PoseidonT3
     const poseidonT3Factory = await ethers.getContractFactory("PoseidonT3");
     const poseidonT3 = await poseidonT3Factory.deploy();
     await poseidonT3.waitForDeployment();
     log("  └─ PoseidonT3 deployed to:", await poseidonT3.getAddress());
 
+    // Deploy Verifier
     const verifierFactory = await ethers.getContractFactory("AlwaysValidVerifier");
     const verifierContract = await verifierFactory.deploy();
     await verifierContract.waitForDeployment();
     log("  └─ Semaphore Verifier deployed to:", await verifierContract.getAddress());
+
+    // Deploy Paymaster
     const simpleSemaphorePaymasterFactory = await ethers.getContractFactory("SimpleSemaphorePaymaster", {
       libraries: {
         PoseidonT3: await poseidonT3.getAddress()
       }
     });
-    simpleSemaphorePaymaster = await simpleSemaphorePaymasterFactory.deploy(context.entryPointAddress, await verifierContract.getAddress());
-    await simpleSemaphorePaymaster.waitForDeployment();
-    log("  └─ Simple Semaphore Paymaster deployed to:", await simpleSemaphorePaymaster.getAddress());
+    const paymaster = await simpleSemaphorePaymasterFactory.deploy(entryPointAddress, await verifierContract.getAddress());
+    await paymaster.waitForDeployment();
+    log("  └─ Simple Semaphore Paymaster deployed to:", await paymaster.getAddress());
 
-    // create a group
-    await simpleSemaphorePaymaster["createGroup()"]()
-    await simpleSemaphorePaymaster.addMembers(groupId, group.members)
-    log("  └─ Group created with commitments:", group.members)
+    return paymaster;
+  }
 
-    // deposit 0.01 ETH to the paymaster for the group
-    await simpleSemaphorePaymaster.depositForGroup(groupId, { value: ethers.parseEther("10") })
-    const deposit = await simpleSemaphorePaymaster.getDeposit()
-    log("  └─ Deposited", ethers.formatEther(deposit), "ETH to the paymaster for the group")
-
-
-    // add stake for the paymaster
-    await simpleSemaphorePaymaster.addStake(1, { value: ethers.parseEther("1") })
-    log("  └─ Staked ETH to the paymaster")
-
-    log("\n✅ Setup Complete!\n");
-  });
-
-  it("should execute a simple ETH transfer", async () => {
-    const message = await generateMessage(simpleAccount)
-    const paymasterData = await generatePaymasterData(id1, group, message, groupId)
-    log("  └─ Paymaster Data:", paymasterData)
-    await assertSendEth(transferAmount, paymasterData);
-  });
-
-  it("should send 2 more eth", async () => {
-    const message = await generateMessage(simpleAccount)
-    const paymasterData = await generatePaymasterData(id1, group, message, groupId)
-    log("  └─ Paymaster Data:", paymasterData)
-    await assertSendEth(ethers.parseEther("2"), paymasterData);
-  });
-
-  it("should not allow proof reuse", async () => {
-    const message = await generateMessage(simpleAccount)
-    const paymasterData = await generatePaymasterData(id1, group, message, groupId)
-    await assertSendEth(ethers.parseEther("2"), paymasterData, true); // first time should succeed
-    await assertSendEth(ethers.parseEther("2"), paymasterData, false); // second time should fail
-  });
-
-  it("should allow deposits for a group", async () => {
-    const depositAmount = ethers.parseEther("5");
-    const initialDeposit = await simpleSemaphorePaymaster.groupDeposits(groupId);
-
-    await simpleSemaphorePaymaster.depositForGroup(groupId, { value: depositAmount });
-
-    const finalDeposit = await simpleSemaphorePaymaster.groupDeposits(groupId);
-    expect(finalDeposit).to.equal(initialDeposit + depositAmount);
-  });
-
-  it("should reject deposits of zero amount", async () => {
-    await expect(
-      simpleSemaphorePaymaster.depositForGroup(groupId, { value: 0 })
-    ).to.be.revertedWith("Must deposit non-zero amount");
-  });
-
-  it("should fail when group has insufficient balance", async () => {
-    // Create a new group with no deposits
-    const newGroupId = 1;
-    await simpleSemaphorePaymaster["createGroup()"]();
-    await simpleSemaphorePaymaster.addMembers(newGroupId, group.members);
-
-    const message = await generateMessage(simpleAccount);
-    const paymasterData = await generatePaymasterData(id1, group, message, newGroupId);
-
-    await assertSendEth(transferAmount, paymasterData, false);
-  });
-
-  it("should fail with invalid message", async () => {
-    const invalidMessage = 12345n; // Wrong message format
-    const paymasterData = await generatePaymasterData(id1, group, invalidMessage, groupId);
-
-    await assertSendEth(transferAmount, paymasterData, false);
-  });
-
-  it("should allow multiple users from same group to send transactions", async () => {
-    // First user (id1)
-    const message1 = await generateMessage(simpleAccount);
-    const paymasterData1 = await generatePaymasterData(id1, group, message1, groupId);
-    await assertSendEth(transferAmount, paymasterData1, true);
-
-    // Second user (id2)
-    const message2 = await generateMessage(simpleAccount);
-    const paymasterData2 = await generatePaymasterData(id2, group, message2, groupId);
-    await assertSendEth(transferAmount, paymasterData2, true);
-  });
-
-  it("should track group deposits correctly after transactions", async () => {
-    const initialDeposit = await simpleSemaphorePaymaster.groupDeposits(groupId);
-
-    const message = await generateMessage(simpleAccount);
-    const paymasterData = await generatePaymasterData(id1, group, message, groupId);
-
-    // Send transaction and track gas usage
-    const userOp = await prepareUserOp(
-      prepareTransferCallData(recipientAddress, transferAmount),
-      paymasterData
-    );
-    const receipt = await sendUserOpAndWait(
-      userOp,
-      context.entryPointAddress,
-      context.bundlerProvider
-    );
-
-    const finalDeposit = await simpleSemaphorePaymaster.groupDeposits(groupId);
-    expect(finalDeposit).to.be.lessThan(initialDeposit);
-  });
 
   async function generateMessage(account: SimpleAccount) {
     // the message is keccak256(abi.encode(sender, nonce))
@@ -352,4 +218,165 @@ describe("SimplePaymasterTest", () => {
       )
     ).to.be.rejected;
   }
+
+  beforeEach(async () => {
+    log("\n🚀 Initializing Simple Account Test Suite...");
+    log("\n🔧 Environment Configuration:");
+    log("  ├─ BUNDLER: 🔒 SAFE (port 3000)");
+    log(`  └─ STAKE_ACCOUNT: ${process.env.STAKE_ACCOUNT || 'false'}`);
+
+    // Setup providers and get entrypoint
+    const { provider, bundlerProvider, entryPointAddress } = await setupProviders();
+
+    // Setup identities and signers
+    const { admin, owner: setupOwner } = await setupIdentities();
+    [owner, recipient] = await ethers.getSigners();
+
+    context = {
+      bundlerProvider,
+      provider,
+      admin,
+      owner,
+      entryPointAddress
+    };
+
+    log("\n📋 Test Configuration:");
+    log("  ├─ Owner Address:", await owner.getAddress());
+    log("  ├─ Owner Balance:", ethers.formatEther(await provider.getBalance(await owner.getAddress())), "ETH");
+    log("  ├─ EntryPoint:", entryPointAddress);
+    log("  └─ Bundler URL: http://localhost:3000/rpc (🔒 SAFE)");
+
+    recipientAddress = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
+
+    // Deploy and setup Simple Account
+    log("\n🔧 Deploying Contracts:");
+    simpleAccount = await setupSimpleAccount(entryPointAddress);
+
+    // Fund the account
+    const fundingAmount = ethers.parseEther("1000");
+    log("\n💰 Funding Account:");
+    log("  └─ Sending", ethers.formatEther(fundingAmount), "ETH to Simple Account");
+    await owner.sendTransaction({
+      to: await simpleAccount.getAddress(),
+      value: fundingAmount
+    });
+
+    // Handle staking
+    if (process.env.STAKE_ACCOUNT === 'true') {
+      log("\n🔒 Adding Stake:");
+      log("  └─ Staking 1 ETH to account");
+      await simpleAccount.addStake(1, { value: ethers.parseEther("1") });
+    } else {
+      log("\nℹ️  Stake Status:");
+      log("  └─ Skipping account staking (STAKE_ACCOUNT not set)");
+    }
+
+    // Deploy Semaphore contracts
+    log("\n🔧 Deploying Semaphore Contracts:");
+    simpleSemaphorePaymaster = await setupSemaphoreContracts(entryPointAddress);
+
+    // Setup group and deposits
+    await simpleSemaphorePaymaster["createGroup()"]();
+    await simpleSemaphorePaymaster.addMembers(groupId, group.members);
+    log("  └─ Group created with commitments:", group.members);
+
+    await simpleSemaphorePaymaster.depositForGroup(groupId, { value: ethers.parseEther("10") });
+    const deposit = await simpleSemaphorePaymaster.getDeposit();
+    log("  └─ Deposited", ethers.formatEther(deposit), "ETH to the paymaster for the group");
+
+    await simpleSemaphorePaymaster.addStake(1, { value: ethers.parseEther("1") });
+    log("  └─ Staked ETH to the paymaster");
+
+    log("\n✅ Setup Complete!\n");
+  });
+
+  it("should execute a simple ETH transfer", async () => {
+    const message = await generateMessage(simpleAccount)
+    const paymasterData = await generatePaymasterData(id1, group, message, groupId)
+    log("  └─ Paymaster Data:", paymasterData)
+    await assertSendEth(transferAmount, paymasterData);
+  });
+
+  it("should send 2 more eth", async () => {
+    const message = await generateMessage(simpleAccount)
+    const paymasterData = await generatePaymasterData(id1, group, message, groupId)
+    log("  └─ Paymaster Data:", paymasterData)
+    await assertSendEth(ethers.parseEther("2"), paymasterData);
+  });
+
+  it("should not allow proof reuse", async () => {
+    const message = await generateMessage(simpleAccount)
+    const paymasterData = await generatePaymasterData(id1, group, message, groupId)
+    await assertSendEth(ethers.parseEther("2"), paymasterData, true); // first time should succeed
+    await assertSendEth(ethers.parseEther("2"), paymasterData, false); // second time should fail
+  });
+
+  it("should allow deposits for a group", async () => {
+    const depositAmount = ethers.parseEther("5");
+    const initialDeposit = await simpleSemaphorePaymaster.groupDeposits(groupId);
+
+    await simpleSemaphorePaymaster.depositForGroup(groupId, { value: depositAmount });
+
+    const finalDeposit = await simpleSemaphorePaymaster.groupDeposits(groupId);
+    expect(finalDeposit).to.equal(initialDeposit + depositAmount);
+  });
+
+  it("should reject deposits of zero amount", async () => {
+    await expect(
+      simpleSemaphorePaymaster.depositForGroup(groupId, { value: 0 })
+    ).to.be.revertedWith("Must deposit non-zero amount");
+  });
+
+  it("should fail when group has insufficient balance", async () => {
+    // Create a new group with no deposits
+    const newGroupId = 1;
+    await simpleSemaphorePaymaster["createGroup()"]();
+    await simpleSemaphorePaymaster.addMembers(newGroupId, group.members);
+
+    const message = await generateMessage(simpleAccount);
+    const paymasterData = await generatePaymasterData(id1, group, message, newGroupId);
+
+    await assertSendEth(transferAmount, paymasterData, false);
+  });
+
+  it("should fail with invalid message", async () => {
+    const invalidMessage = 12345n; // Wrong message format
+    const paymasterData = await generatePaymasterData(id1, group, invalidMessage, groupId);
+
+    await assertSendEth(transferAmount, paymasterData, false);
+  });
+
+  it("should allow multiple users from same group to send transactions", async () => {
+    // First user (id1)
+    const message1 = await generateMessage(simpleAccount);
+    const paymasterData1 = await generatePaymasterData(id1, group, message1, groupId);
+    await assertSendEth(transferAmount, paymasterData1, true);
+
+    // Second user (id2)
+    const message2 = await generateMessage(simpleAccount);
+    const paymasterData2 = await generatePaymasterData(id2, group, message2, groupId);
+    await assertSendEth(transferAmount, paymasterData2, true);
+  });
+
+  it("should track group deposits correctly after transactions", async () => {
+    const initialDeposit = await simpleSemaphorePaymaster.groupDeposits(groupId);
+
+    const message = await generateMessage(simpleAccount);
+    const paymasterData = await generatePaymasterData(id1, group, message, groupId);
+
+    // Send transaction and track gas usage
+    const userOp = await prepareUserOp(
+      prepareTransferCallData(recipientAddress, transferAmount),
+      paymasterData
+    );
+    const receipt = await sendUserOpAndWait(
+      userOp,
+      context.entryPointAddress,
+      context.bundlerProvider
+    );
+
+    const finalDeposit = await simpleSemaphorePaymaster.groupDeposits(groupId);
+    expect(finalDeposit).to.be.lessThan(initialDeposit);
+  });
+
 });
