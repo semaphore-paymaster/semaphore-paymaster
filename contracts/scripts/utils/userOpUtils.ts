@@ -8,7 +8,7 @@ import {
   JsonRpcProvider,
   keccak256,
 } from "ethers";
-import { PackedUserOperationStruct } from "../../typechain/contracts/EmailAccount";
+import { PackedUserOperationStruct } from "../../typechain/contracts/SimpleSemaphorePaymaster";
 import { ethers } from "ethers";
 import { IEntryPoint__factory } from "../../typechain";
 
@@ -282,6 +282,7 @@ export const createUserOperation = async (
     entryPointAddress,
     await provider.getSigner()
   );
+
   const nonce = await entryPoint.getNonce(accountAddress, "0x00");
   const nonceHex = "0x0" + nonce.toString();
 
@@ -318,16 +319,16 @@ export const createUserOperation = async (
     factory: userOp.factory,
     factoryData: userOp.factoryData,
     callData: userOpCallData,
-    callGasLimit,
-    verificationGasLimit,
-    preVerificationGas,
-    maxFeePerGas,
-    maxPriorityFeePerGas,
+    callGasLimit: "0x" + (BigInt(callGasLimit) * 2n).toString(16),
+    verificationGasLimit: "0x" + (BigInt(verificationGasLimit) * 10n).toString(16),
+    preVerificationGas: BigInt(preVerificationGas) < 117112n ? "0x1c998" : "0x" + (BigInt(preVerificationGas) * 2n).toString(16),
+    maxFeePerGas: "0x" + (BigInt(maxFeePerGas) * 2n).toString(16),
+    maxPriorityFeePerGas: "0x" + (BigInt(maxPriorityFeePerGas) * 2n).toString(16),
     paymaster: paymaster,
     paymasterVerificationGasLimit: paymaster
-      ? paymasterVerificationGasLimit
+      ? BigInt(paymasterVerificationGasLimit) < 1200000n ? "0x124f80" : "0x" + (BigInt(paymasterVerificationGasLimit) * 2n).toString(16)
       : undefined,
-    paymasterPostOpGasLimit: paymasterPostOpGasLimit,
+    paymasterPostOpGasLimit: BigInt(paymasterPostOpGasLimit || 0) < 1200000n ? "0x124f80" : "0x" + (BigInt(paymasterPostOpGasLimit || 0) * 2n).toString(16),
     paymasterData: paymasterData,
     signature: dummySignature,
   } satisfies UserOperation;
@@ -379,7 +380,10 @@ export async function generateUnsignedUserOp(
   provider: JsonRpcProvider,
   bundlerProvider: JsonRpcProvider,
   emailAccountAddress: string,
-  callData: string
+  callData: string,
+  paymaster?: string,
+  paymasterPostOpGasLimit?: BigNumberish,
+  paymasterData?: BytesLike
 ) {
   const dummySignature = "0x";
 
@@ -390,7 +394,11 @@ export async function generateUnsignedUserOp(
     { factory: "0x", factoryData: "0x" },
     callData,
     entryPointAddress,
-    dummySignature // Temporary placeholder for signature
+    dummySignature,
+    paymaster,
+    paymasterPostOpGasLimit,
+    paymasterData
   );
 }
+
 
