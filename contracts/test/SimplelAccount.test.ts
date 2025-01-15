@@ -12,7 +12,7 @@ import sendUserOpAndWait, {
 import { expect } from "chai";
 import { Identity, Group, generateProof } from "@semaphore-protocol/core"
 
-describe("EmailAccountTest", () => {
+describe("SimplePaymasterTest", () => {
   let context: {
     bundlerProvider: JsonRpcProvider;
     provider: JsonRpcProvider;
@@ -90,7 +90,6 @@ describe("EmailAccountTest", () => {
     await simpleAccountFactory.waitForDeployment();
     console.log("  └─ Simple Account Factory deployed to:", await simpleAccountFactory.getAddress());
 
-    // deploy the email account using the factory
     console.log("\n📬 Creating Simple Account:");
     const salt = ethers.randomBytes(32);
     await simpleAccountFactory.createSimpleAccount(salt);
@@ -100,7 +99,7 @@ describe("EmailAccountTest", () => {
     // fund the account from owner's account
     const fundingAmount = ethers.parseEther("1000");
     console.log("\n💰 Funding Account:");
-    console.log("  └─ Sending", ethers.formatEther(fundingAmount), "ETH to Email Account");
+    console.log("  └─ Sending", ethers.formatEther(fundingAmount), "ETH to Simple Account");
     await owner.sendTransaction({
       to: await simpleAccount.getAddress(),
       value: fundingAmount
