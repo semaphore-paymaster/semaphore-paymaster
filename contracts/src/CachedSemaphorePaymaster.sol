@@ -5,6 +5,7 @@ pragma solidity ^0.8.23;
 import "@account-abstraction/contracts/core/BasePaymaster.sol";
 import "@account-abstraction/contracts/core/Helpers.sol";
 import "@semaphore-protocol/contracts/Semaphore.sol";
+import {console} from "forge-std/console.sol";
 
 /**
  * @title CachedSemaphorePaymaster
@@ -85,6 +86,7 @@ contract CachedSemaphorePaymaster is BasePaymaster, Semaphore {
         uint256 expectedMessage = uint256(keccak256(abi.encode(userOp.sender)));
 
         if (useCached) {
+            console.log("useCached");
             // Use cached proof
             CachedProof storage cached = cachedProofs[userOp.sender];
             if (!cached.isValid || cached.groupId != groupId) {
@@ -93,6 +95,7 @@ contract CachedSemaphorePaymaster is BasePaymaster, Semaphore {
 
             // Check if merkle root has changed
             if (groupMerkleRoots[groupId] != cached.merkleRoot) {
+                console.log("merkle root has changed");
                 // Verify the cached proof against new merkle root
                 if (!this.verifyProof(groupId, cached.proof)) {
                     return ("", _packValidationData(true, 0, 0));
@@ -148,15 +151,5 @@ contract CachedSemaphorePaymaster is BasePaymaster, Semaphore {
         uint256 groupId = abi.decode(context, (uint256));
         // Deduct actual gas cost from group balance
         groupDeposits[groupId] -= actualGasCost;
-    }
-
-    /**
-     * @notice Updates the merkle root for a group
-     * @param groupId The ID of the group
-     * @param newRoot The new merkle root
-     */
-    function updateGroupMerkleRoot(uint256 groupId, uint256 newRoot) external {
-        require(msg.sender == address(this), "Only callable by contract");
-        groupMerkleRoots[groupId] = newRoot;
     }
 }
