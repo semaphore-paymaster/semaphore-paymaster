@@ -127,22 +127,10 @@ contract SimpleSemaphorePaymasterTest is Test {
         uint256 initialDeposit = paymaster.groupDeposits(GROUP_ID);
         uint256 gasCost = 0.1 ether;
 
-        // Create valid proof and context
-        uint256[8] memory points;
-        ISemaphore.SemaphoreProof memory proof = ISemaphore.SemaphoreProof({
-            merkleTreeDepth: 20,
-            merkleTreeRoot: 123,
-            nullifier: 456,
-            message: uint256(uint160(sender)),
-            scope: 0,
-            points: points
-        });
-
-        bytes memory context = abi.encode(SimpleSemaphorePaymaster.PaymasterData({groupId: GROUP_ID, proof: proof}));
+        bytes memory context = abi.encode(GROUP_ID);
 
         // Execute postOp
         vm.prank(address(entryPoint));
-        _mockAndExpect(address(paymaster), abi.encodeCall(paymaster.validateProof, (GROUP_ID, proof)), "");
         paymaster.postOp(IPaymaster.PostOpMode.opSucceeded, context, gasCost, 0);
         vm.stopPrank();
 

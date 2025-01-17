@@ -73,7 +73,7 @@ contract SimpleSemaphorePaymaster is BasePaymaster, Semaphore {
 
         // Verify the proof directly using data.proof
         if (this.verifyProof(data.groupId, data.proof)) {
-            return (abi.encode(data), _packValidationData(false, 0, 0));
+            return (abi.encode(data.groupId), _packValidationData(false, 0, 0));
         }
         return ("", _packValidationData(true, 0, 0));
     }
@@ -89,8 +89,8 @@ contract SimpleSemaphorePaymaster is BasePaymaster, Semaphore {
         uint256 actualGasCost,
         uint256 /*actualUserOpFeePerGas*/
     ) internal override {
-        PaymasterData memory data = abi.decode(context, (PaymasterData));
+        uint256 groupId = abi.decode(context, (uint256));
         // Deduct actual gas cost from group balance
-        groupDeposits[data.groupId] -= actualGasCost;
+        groupDeposits[groupId] -= actualGasCost;
     }
 }
