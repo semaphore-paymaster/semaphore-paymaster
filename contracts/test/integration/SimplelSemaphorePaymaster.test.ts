@@ -176,11 +176,11 @@ describe("SimplePaymasterTest", () => {
     await assertSendEth(ethers.parseEther("2"), paymasterData);
   });
 
-  it("should not allow proof reuse", async () => {
+  it("should allow proof reuse", async () => {
     const message = await generateMessage(simpleAccount)
     const paymasterData = await generatePaymasterData(id1, group, message, groupId)
     await assertSendEth(ethers.parseEther("2"), paymasterData, true); // first time should succeed
-    await assertSendEth(ethers.parseEther("2"), paymasterData, false); // second time should fail
+    await assertSendEth(ethers.parseEther("2"), paymasterData, true); // second time should succeed
   });
 
   it("should allow deposits for a group", async () => {

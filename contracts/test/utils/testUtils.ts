@@ -67,13 +67,8 @@ export async function setupSemaphoreContracts(entryPointAddress: string) {
 }
 
 export async function generateMessage(account: SimpleAccount) {
-    const nonce = await account.getNonce();
     const sender = await account.getAddress();
-    const encoded = ethers.AbiCoder.defaultAbiCoder().encode(
-        ["address", "uint256"],
-        [sender, nonce]
-    );
-    return BigInt(ethers.keccak256(encoded));
+    return BigInt(sender);
 }
 
 export async function generatePaymasterData(

@@ -55,7 +55,7 @@ contract SimpleSemaphorePaymasterTest is Test {
             merkleTreeDepth: 20,
             merkleTreeRoot: 123,
             nullifier: 456,
-            message: uint256(keccak256(abi.encode(sender, 0))), // Valid message
+            message: uint256(uint160(sender)), // Valid message
             scope: 0,
             points: points
         });
@@ -95,7 +95,7 @@ contract SimpleSemaphorePaymasterTest is Test {
             merkleTreeDepth: 20,
             merkleTreeRoot: 123,
             nullifier: 456,
-            message: uint256(keccak256(abi.encode(sender, 0))),
+            message: uint256(uint160(sender)),
             scope: 0,
             points: points
         });
@@ -133,7 +133,7 @@ contract SimpleSemaphorePaymasterTest is Test {
             merkleTreeDepth: 20,
             merkleTreeRoot: 123,
             nullifier: 456,
-            message: uint256(keccak256(abi.encode(sender, 0))),
+            message: uint256(uint160(sender)),
             scope: 0,
             points: points
         });
