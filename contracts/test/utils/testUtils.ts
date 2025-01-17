@@ -43,7 +43,7 @@ export async function setupSimpleAccount(entryPointAddress: string) {
     );
 }
 
-export async function setupSemaphoreContracts(entryPointAddress: string) {
+export async function setupSemaphoreContracts(entryPointAddress: string, useCached: boolean = false) {
     const poseidonT3Factory = await ethers.getContractFactory("PoseidonT3");
     const poseidonT3 = await poseidonT3Factory.deploy();
     await poseidonT3.waitForDeployment();
@@ -52,15 +52,16 @@ export async function setupSemaphoreContracts(entryPointAddress: string) {
     const verifierContract = await verifierFactory.deploy();
     await verifierContract.waitForDeployment();
 
-    const simpleSemaphorePaymasterFactory = await ethers.getContractFactory(
-        "SimpleSemaphorePaymaster",
+    const contractName = useCached ? "CachedSemaphorePaymaster" : "SimpleSemaphorePaymaster";
+    const paymasterFactory = await ethers.getContractFactory(
+        contractName,
         {
             libraries: {
                 PoseidonT3: await poseidonT3.getAddress()
             }
         }
     );
-    return await simpleSemaphorePaymasterFactory.deploy(
+    return await paymasterFactory.deploy(
         entryPointAddress,
         await verifierContract.getAddress()
     );
@@ -78,10 +79,41 @@ export async function generatePaymasterData(
     groupId: number
 ) {
     const proof = await generateProof(id, group, message, groupId);
-    return ethers.AbiCoder.defaultAbiCoder().encode(
+    const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+
+    return abiCoder.encode(
         ["tuple(uint256 groupId, tuple(uint256 merkleTreeDepth, uint256 merkleTreeRoot, uint256 nullifier, uint256 message, uint256 scope, uint256[8] points) proof)"],
         [{ groupId: groupId, proof }]
     );
+}
+
+export async function generateCachedPaymasterData(
+    id: Identity,
+    group: Group,
+    message: bigint,
+    groupId: number,
+    useCache: boolean = false
+) {
+    const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+
+    if (useCache) {
+        // Return cached format with flag
+        return ethers.concat([
+            "0x01", // Using cache flag
+            abiCoder.encode(["uint256"], [groupId])
+        ]);
+    }
+
+    // Generate new proof format
+    const proof = await generateProof(id, group, message, groupId);
+    return ethers.concat([
+        "0x00", // Not using cache flag
+        abiCoder.encode(["uint256"], [groupId]),
+        abiCoder.encode(
+            ["tuple(uint256 merkleTreeDepth, uint256 merkleTreeRoot, uint256 nullifier, uint256 message, uint256 scope, uint256[8] points)"],
+            [proof]
+        )
+    ]);
 }
 
 export function prepareTransferCallData(to: string, amount: bigint): string {
