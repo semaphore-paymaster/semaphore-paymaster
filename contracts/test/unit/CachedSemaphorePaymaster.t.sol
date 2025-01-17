@@ -9,16 +9,8 @@ import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/Pac
 import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.sol";
 import {IPaymaster} from "@account-abstraction/contracts/interfaces/IPaymaster.sol";
 
-contract TestCachedSemaphorePaymaster is CachedSemaphorePaymaster {
-    constructor(address _entryPoint, address _verifier) CachedSemaphorePaymaster(_entryPoint, _verifier) {}
-
-    function updateGroupMerkleRoot(uint256 groupId, uint256 newRoot) public {
-        groupMerkleRoots[groupId] = newRoot;
-    }
-}
-
 contract CachedSemaphorePaymasterTest is Test {
-    TestCachedSemaphorePaymaster public paymaster;
+    CachedSemaphorePaymaster public paymaster;
     AlwaysValidVerifier public verifier;
     address public entryPoint;
     address public sender = address(0x1234);
@@ -30,7 +22,7 @@ contract CachedSemaphorePaymasterTest is Test {
         verifier = new AlwaysValidVerifier();
 
         // Deploy paymaster
-        paymaster = new TestCachedSemaphorePaymaster(entryPoint, address(verifier));
+        paymaster = new CachedSemaphorePaymaster(entryPoint, address(verifier));
 
         // Create group and fund it
         paymaster.createGroup();
@@ -90,9 +82,8 @@ contract CachedSemaphorePaymasterTest is Test {
         _createAndCacheProof(sender);
 
         // Verify proof was cached
-        (uint256 cachedGroupId, , , bool isValid) = paymaster.cachedProofs(sender);
-        assertTrue(isValid, "Proof should be cached");
-        assertEq(cachedGroupId, GROUP_ID, "Cached group ID should match");
+        bool hasValidCachedProof = paymaster.isValidCachedProof(sender, GROUP_ID);
+        assertTrue(hasValidCachedProof, "Proof should be cached");
     }
 
     function test_ValidatePaymasterUserOpWithCachedProof() public {
@@ -120,11 +111,14 @@ contract CachedSemaphorePaymasterTest is Test {
         assertEq(validationData2, 0, "Validation should succeed with cached proof");
     }
 
-    function test_CachedProofValidAfterNewMember() public {
+    function test_CachedProofInvalidAfterMerkleRootChange() public {
         _createAndCacheProof(sender);
 
-        // Simulate adding new member
-        paymaster.updateGroupMerkleRoot(GROUP_ID, 789);
+        // add member to group to change merkle root
+        paymaster.addMember(GROUP_ID, 1);
+
+        bool isValidCachedProof = paymaster.isValidCachedProof(sender, GROUP_ID);
+        assertFalse(isValidCachedProof, "Proof should be invalid after merkle root change");
 
         // Try using cached proof after merkle root change
         bytes memory cachedPaymasterData = bytes.concat(
@@ -142,7 +136,6 @@ contract CachedSemaphorePaymasterTest is Test {
 
         // Validate with cached proof against new merkle root
         vm.prank(address(entryPoint));
-        _mockAndExpect(address(paymaster), abi.encodeWithSelector(paymaster.verifyProof.selector), abi.encode(true)); // expect to be called again
         (bytes memory context, uint256 validationData) = paymaster.validatePaymasterUserOp(
             userOp2,
             bytes32(0),
@@ -150,45 +143,7 @@ contract CachedSemaphorePaymasterTest is Test {
         );
         vm.stopPrank();
 
-        assertEq(validationData, 0, "Validation should succeed with cached proof after merkle root update");
-        assertGt(context.length, 0, "Context should not be empty");
-    }
-
-    function test_CacheFailsAfterMemberRemoval() public {
-        _createAndCacheProof(sender);
-
-        // Store initial merkle root
-        uint256 initialRoot = paymaster.groupMerkleRoots(GROUP_ID);
-
-        // Add member to change merkle root
-        paymaster.updateGroupMerkleRoot(GROUP_ID, 789);
-
-        // Verify root changed
-        uint256 newRoot = paymaster.groupMerkleRoots(GROUP_ID);
-        require(initialRoot != newRoot, "Merkle root should change after member update");
-
-        // Try using cached proof after merkle root change
-        bytes memory cachedPaymasterData = bytes.concat(
-            hex"01", // Using cache
-            bytes32(GROUP_ID)
-        );
-
-        PackedUserOperation memory userOp;
-        userOp.sender = sender;
-        userOp.paymasterAndData = bytes.concat(
-            abi.encodePacked(address(paymaster)),
-            new bytes(32),
-            cachedPaymasterData
-        );
-
-        // Validate with cached proof - should fail
-        vm.prank(address(entryPoint));
-        // Mock verifyProof to return false for removed member
-        vm.mockCall(address(paymaster), abi.encodeWithSelector(paymaster.verifyProof.selector), abi.encode(false));
-        (bytes memory context, uint256 validationData) = paymaster.validatePaymasterUserOp(userOp, bytes32(0), 1 ether);
-        vm.stopPrank();
-
-        assertEq(validationData, 1, "Validation should fail with cached proof after merkle root change");
+        assertEq(validationData, 1, "Validation should fail with cached proof after merkle root update");
         assertEq(context.length, 0, "Context should be empty");
     }
 

@@ -15,32 +15,25 @@ import "@semaphore-protocol/contracts/Semaphore.sol";
 contract CachedSemaphorePaymaster is BasePaymaster, Semaphore {
     /**
      * @notice Cached proof data structure
-     * @dev Stores a previously validated proof along with its group ID, merkle root, and validity status
+     * @dev Stores a previously validated proof along with its merkle root and validity status
      */
     struct CachedProof {
-        uint256 groupId;
         ISemaphore.SemaphoreProof proof;
         uint256 merkleRoot;
-        bool isValid;
+        bool exists;
     }
+
+    /**
+     * @notice Mapping from address to group ID to cached proof data
+     * @dev Stores cached proofs for each user address and group combination
+     */
+    mapping(address => mapping(uint256 => CachedProof)) public cachedProofs;
 
     /**
      * @notice Mapping from group ID to deposited balance
      * @dev Tracks the available funds for each group to pay for gas
      */
     mapping(uint256 => uint256) public groupDeposits;
-
-    /**
-     * @notice Mapping from address to cached proof data
-     * @dev Stores cached proofs for each user address to avoid re-verification
-     */
-    mapping(address => CachedProof) public cachedProofs;
-
-    /**
-     * @notice Mapping from group ID to current merkle root
-     * @dev Tracks the current merkle root for each group to detect membership changes
-     */
-    mapping(uint256 => uint256) public groupMerkleRoots;
 
     /**
      * @notice Constructs the paymaster with required parameters
@@ -61,6 +54,17 @@ contract CachedSemaphorePaymaster is BasePaymaster, Semaphore {
         require(msg.value > 0, "Must deposit non-zero amount");
         groupDeposits[groupId] += msg.value;
         this.deposit{value: msg.value}();
+    }
+
+    /**
+     * @notice Checks if a cached proof for an address is valid for a specific group
+     * @param user The address to check the cached proof for
+     * @param groupId The group ID to validate against
+     * @return bool True if the cached proof is valid, false otherwise
+     */
+    function isValidCachedProof(address user, uint256 groupId) public view returns (bool) {
+        CachedProof memory cached = cachedProofs[user][groupId];
+        return cached.exists && cached.merkleRoot == getMerkleTreeRoot(groupId);
     }
 
     /**
@@ -91,31 +95,11 @@ contract CachedSemaphorePaymaster is BasePaymaster, Semaphore {
             return ("", _packValidationData(true, 0, 0));
         }
 
-        // Generate message using only sender address
-        uint256 expectedMessage = uint256(uint160(userOp.sender));
-
         if (useCached) {
-            // Use cached proof
-            CachedProof storage cached = cachedProofs[userOp.sender];
-            if (!cached.isValid || cached.groupId != groupId) {
+            // Use cached proof validation
+            if (!isValidCachedProof(userOp.sender, groupId)) {
                 return ("", _packValidationData(true, 0, 0));
             }
-
-            // Check if merkle root has changed
-            if (groupMerkleRoots[groupId] != cached.merkleRoot) {
-                // Verify the cached proof against new merkle root
-                if (!this.verifyProof(groupId, cached.proof)) {
-                    return ("", _packValidationData(true, 0, 0));
-                }
-                // Update stored merkle root
-                cached.merkleRoot = groupMerkleRoots[groupId];
-            }
-
-            // Verify message matches
-            if (cached.proof.message != expectedMessage) {
-                return ("", _packValidationData(true, 0, 0));
-            }
-
             return (abi.encode(groupId), _packValidationData(false, 0, 0));
         } else {
             // Decode new proof from remaining data
@@ -123,6 +107,8 @@ contract CachedSemaphorePaymaster is BasePaymaster, Semaphore {
                 userOp.paymasterAndData[PAYMASTER_DATA_OFFSET + 33:],
                 (ISemaphore.SemaphoreProof)
             );
+
+            uint256 expectedMessage = uint256(uint160(userOp.sender));
 
             // Verify message
             if (proof.message != expectedMessage) {
@@ -132,11 +118,10 @@ contract CachedSemaphorePaymaster is BasePaymaster, Semaphore {
             // Verify new proof
             if (this.verifyProof(groupId, proof)) {
                 // Cache the proof
-                cachedProofs[userOp.sender] = CachedProof({
-                    groupId: groupId,
+                cachedProofs[userOp.sender][groupId] = CachedProof({
                     proof: proof,
-                    merkleRoot: groupMerkleRoots[groupId],
-                    isValid: true
+                    merkleRoot: getMerkleTreeRoot(groupId),
+                    exists: true
                 });
                 return (abi.encode(groupId), _packValidationData(false, 0, 0));
             }

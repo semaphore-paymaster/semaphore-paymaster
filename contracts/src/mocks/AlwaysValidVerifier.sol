@@ -7,12 +7,12 @@ import {ISemaphoreVerifier} from "@semaphore-protocol/contracts/interfaces/ISema
 
 contract AlwaysValidVerifier is ISemaphoreVerifier {
     function verifyProof(
-        uint[2] calldata _pA,
-        uint[2][2] calldata _pB,
-        uint[2] calldata _pC,
-        uint[4] calldata _pubSignals,
-        uint merkleTreeDepth
-    ) external view returns (bool) {
+        uint[2] calldata,
+        uint[2][2] calldata,
+        uint[2] calldata,
+        uint[4] calldata,
+        uint
+    ) external pure returns (bool) {
         // Mock implementation that always returns true
         return true;
     }
