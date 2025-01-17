@@ -14,6 +14,7 @@ import "@semaphore-protocol/contracts/Semaphore.sol";
 contract SimpleSemaphorePaymaster is BasePaymaster, Semaphore {
     /**
      * @notice Paymaster data structure containing group ID and proof
+     * @dev Used to decode the paymaster data from the user operation
      */
     struct PaymasterData {
         uint256 groupId;
@@ -22,13 +23,14 @@ contract SimpleSemaphorePaymaster is BasePaymaster, Semaphore {
 
     /**
      * @notice Mapping from group ID to deposited balance
+     * @dev Tracks the available funds for each group to pay for gas
      */
     mapping(uint256 => uint256) public groupDeposits;
 
     /**
      * @notice Constructs the paymaster with required parameters
      * @param _entryPoint The EntryPoint contract address
-     * @param _verifier The Verifier contract address
+     * @param _verifier The Semaphore verifier contract address
      */
     constructor(
         address _entryPoint,
@@ -38,6 +40,7 @@ contract SimpleSemaphorePaymaster is BasePaymaster, Semaphore {
     /**
      * @notice Allows anyone to deposit funds for a specific group to be used for gas payment for members of the group
      * @param groupId The ID of the group to deposit for
+     * @dev Deposits are added to both the group's balance and the EntryPoint contract
      */
     function depositForGroup(uint256 groupId) external payable {
         require(msg.value > 0, "Must deposit non-zero amount");
@@ -48,9 +51,10 @@ contract SimpleSemaphorePaymaster is BasePaymaster, Semaphore {
     /**
      * @notice Validates a user operation by verifying a Semaphore proof
      * @param userOp The user operation to validate
-     * @return context The encoded proof if valid
-     * @return validationData Packed validation data (0 if valid)
-     * @dev The paymaster data contains the group ID and proof
+     * @param requiredPreFund The amount of funds required for the operation
+     * @return context The encoded group ID if valid
+     * @return validationData Packed validation data (0 if valid, non-zero if invalid)
+     * @dev The paymaster data format starts at offset 52 (20 bytes paymaster address + 32 bytes function selector)
      */
     function _validatePaymasterUserOp(
         PackedUserOperation calldata userOp,
@@ -60,7 +64,7 @@ contract SimpleSemaphorePaymaster is BasePaymaster, Semaphore {
         // Extract and decode the paymaster data
         PaymasterData memory data = abi.decode(userOp.paymasterAndData[52:], (PaymasterData));
 
-        // message must be keccak256(abi.encode(sender))
+        // message must be the sender address cast to uint256
         uint256 expectedMessage = uint256(uint160(userOp.sender));
         if (data.proof.message != expectedMessage) {
             return ("", _packValidationData(true, 0, 0));
@@ -79,9 +83,10 @@ contract SimpleSemaphorePaymaster is BasePaymaster, Semaphore {
     }
 
     /**
-     * @notice Post-operation processing - nullifies the used proof and deducts gas costs
-     * @param context The context containing the paymaster data
-     * @dev This function prevents proof reuse by nullifying it and deducts actual gas costs from group balance
+     * @notice Post-operation processing - deducts gas costs from group balance
+     * @param context The context containing the group ID
+     * @param actualGasCost The actual gas cost of the operation
+     * @dev This function deducts actual gas costs from the group's deposited balance
      */
     function _postOp(
         PostOpMode /*mode*/,
