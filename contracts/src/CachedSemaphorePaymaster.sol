@@ -82,7 +82,7 @@ contract CachedSemaphorePaymaster is BasePaymaster, Semaphore {
         }
 
         // Generate message using only sender address
-        uint256 expectedMessage = uint256(keccak256(abi.encode(userOp.sender)));
+        uint256 expectedMessage = uint256(uint160(userOp.sender));
 
         if (useCached) {
             // Use cached proof

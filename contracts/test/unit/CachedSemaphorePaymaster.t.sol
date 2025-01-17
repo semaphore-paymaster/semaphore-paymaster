@@ -58,7 +58,7 @@ contract CachedSemaphorePaymasterTest is Test {
             merkleTreeDepth: 20,
             merkleTreeRoot: 123,
             nullifier: 456,
-            message: uint256(keccak256(abi.encode(_sender))),
+            message: uint256(uint160(_sender)),
             scope: 0,
             points: points
         });
