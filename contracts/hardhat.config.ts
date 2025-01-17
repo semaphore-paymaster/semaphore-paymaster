@@ -5,7 +5,6 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 const { NODE_URL } = process.env;
-
 const config: HardhatUserConfig = {
   solidity: "0.8.27",
   networks: {
@@ -15,7 +14,8 @@ const config: HardhatUserConfig = {
     },
   },
   paths: {
-    sources: "./src"
+    sources: "./src",
+    artifacts: "./hardhat_artifacts"
   }
 };
 
