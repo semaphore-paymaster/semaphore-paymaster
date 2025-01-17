@@ -5,7 +5,6 @@ pragma solidity ^0.8.23;
 import "@account-abstraction/contracts/core/BasePaymaster.sol";
 import "@account-abstraction/contracts/core/Helpers.sol";
 import "@semaphore-protocol/contracts/Semaphore.sol";
-import {console} from "forge-std/console.sol";
 
 /**
  * @title CachedSemaphorePaymaster
@@ -86,7 +85,6 @@ contract CachedSemaphorePaymaster is BasePaymaster, Semaphore {
         uint256 expectedMessage = uint256(keccak256(abi.encode(userOp.sender)));
 
         if (useCached) {
-            console.log("useCached");
             // Use cached proof
             CachedProof storage cached = cachedProofs[userOp.sender];
             if (!cached.isValid || cached.groupId != groupId) {
