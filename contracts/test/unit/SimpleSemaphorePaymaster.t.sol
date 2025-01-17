@@ -30,8 +30,6 @@ contract SimpleSemaphorePaymasterTest is Test {
         paymaster.addStake{value: 1 ether}(1);
     }
 
-    function test_sample() public {}
-
     function test_DepositForGroup() public {
         uint256 initialDeposit = paymaster.groupDeposits(GROUP_ID);
         uint256 depositAmount = 5 ether;
