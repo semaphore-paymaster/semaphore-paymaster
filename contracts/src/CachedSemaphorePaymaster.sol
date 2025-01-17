@@ -93,7 +93,6 @@ contract CachedSemaphorePaymaster is BasePaymaster, Semaphore {
 
             // Check if merkle root has changed
             if (groupMerkleRoots[groupId] != cached.merkleRoot) {
-                console.log("merkle root has changed");
                 // Verify the cached proof against new merkle root
                 if (!this.verifyProof(groupId, cached.proof)) {
                     return ("", _packValidationData(true, 0, 0));
