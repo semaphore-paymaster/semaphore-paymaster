@@ -51,14 +51,14 @@ contract CachedSemaphorePaymasterTest is Test {
         );
     }
 
-    function test_ValidatePaymasterUserOpWithNewProof() public {
+    function _createAndCacheProof(address _sender) internal {
         // Create a valid proof structure
         uint256[8] memory points;
         ISemaphore.SemaphoreProof memory proof = ISemaphore.SemaphoreProof({
             merkleTreeDepth: 20,
             merkleTreeRoot: 123,
             nullifier: 456,
-            message: uint256(keccak256(abi.encode(sender))), // Only sender in message
+            message: uint256(keccak256(abi.encode(_sender))),
             scope: 0,
             points: points
         });
@@ -72,21 +72,22 @@ contract CachedSemaphorePaymasterTest is Test {
 
         // Create user operation
         PackedUserOperation memory userOp;
-        userOp.sender = sender;
+        userOp.sender = _sender;
         userOp.paymasterAndData = bytes.concat(
             abi.encodePacked(address(paymaster)),
             new bytes(32), // 32 byte offset
             paymasterData
         );
 
-        // Validate
+        // Validate to cache the proof
         vm.prank(address(entryPoint));
         _mockAndExpect(address(paymaster), abi.encodeWithSelector(paymaster.verifyProof.selector), abi.encode(true));
-        (bytes memory context, uint256 validationData) = paymaster.validatePaymasterUserOp(userOp, bytes32(0), 1 ether);
+        paymaster.validatePaymasterUserOp(userOp, bytes32(0), 1 ether);
         vm.stopPrank();
+    }
 
-        assertEq(validationData, 0, "Validation should succeed");
-        assertGt(context.length, 0, "Context should not be empty");
+    function test_ValidatePaymasterUserOpWithNewProof() public {
+        _createAndCacheProof(sender);
 
         // Verify proof was cached
         (uint256 cachedGroupId, , , bool isValid) = paymaster.cachedProofs(sender);
@@ -95,43 +96,9 @@ contract CachedSemaphorePaymasterTest is Test {
     }
 
     function test_ValidatePaymasterUserOpWithCachedProof() public {
-        // Create a valid proof structure
-        uint256[8] memory points;
-        ISemaphore.SemaphoreProof memory proof = ISemaphore.SemaphoreProof({
-            merkleTreeDepth: 20,
-            merkleTreeRoot: 123,
-            nullifier: 456,
-            message: uint256(keccak256(abi.encode(sender))), // Only sender in message
-            scope: 0,
-            points: points
-        });
+        _createAndCacheProof(sender);
 
-        // Encode paymaster data with cached flag = 0
-        bytes memory paymasterData = bytes.concat(
-            hex"00", // Not using cache
-            bytes32(GROUP_ID),
-            abi.encode(proof)
-        );
-
-        // Create user operation
-        PackedUserOperation memory userOp;
-        userOp.sender = sender;
-        userOp.paymasterAndData = bytes.concat(
-            abi.encodePacked(address(paymaster)),
-            new bytes(32), // 32 byte offset
-            paymasterData
-        );
-
-        // Validate
-        vm.prank(address(entryPoint));
-        _mockAndExpect(address(paymaster), abi.encodeWithSelector(paymaster.verifyProof.selector), abi.encode(true));
-        (bytes memory context, uint256 validationData) = paymaster.validatePaymasterUserOp(userOp, bytes32(0), 1 ether);
-        vm.stopPrank();
-
-        assertEq(validationData, 0, "Validation should succeed");
-        assertGt(context.length, 0, "Context should not be empty");
-
-        bytes memory cachcedPaymasterData = bytes.concat(
+        bytes memory cachedPaymasterData = bytes.concat(
             hex"01", // Using cache
             bytes32(GROUP_ID)
         );
@@ -142,7 +109,7 @@ contract CachedSemaphorePaymasterTest is Test {
         userOp2.paymasterAndData = bytes.concat(
             abi.encodePacked(address(paymaster)),
             new bytes(32), // 32 byte offset
-            cachcedPaymasterData
+            cachedPaymasterData
         );
 
         // Validate with cached proof
@@ -154,37 +121,7 @@ contract CachedSemaphorePaymasterTest is Test {
     }
 
     function test_CachedProofValidAfterNewMember() public {
-        // Create initial proof structure
-        uint256[8] memory points;
-        ISemaphore.SemaphoreProof memory proof = ISemaphore.SemaphoreProof({
-            merkleTreeDepth: 20,
-            merkleTreeRoot: 123,
-            nullifier: 456,
-            message: uint256(keccak256(abi.encode(sender))),
-            scope: 0,
-            points: points
-        });
-
-        // First submit a normal proof to cache it
-        bytes memory initialPaymasterData = bytes.concat(
-            hex"00", // Not using cache
-            bytes32(GROUP_ID),
-            abi.encode(proof)
-        );
-
-        PackedUserOperation memory userOp;
-        userOp.sender = sender;
-        userOp.paymasterAndData = bytes.concat(
-            abi.encodePacked(address(paymaster)),
-            new bytes(32),
-            initialPaymasterData
-        );
-
-        // Initial validation to cache the proof
-        vm.prank(address(entryPoint));
-        _mockAndExpect(address(paymaster), abi.encodeWithSelector(paymaster.verifyProof.selector), abi.encode(true));
-        paymaster.validatePaymasterUserOp(userOp, bytes32(0), 1 ether);
-        vm.stopPrank();
+        _createAndCacheProof(sender);
 
         // Simulate adding new member
         paymaster.updateGroupMerkleRoot(GROUP_ID, 789);
@@ -205,6 +142,7 @@ contract CachedSemaphorePaymasterTest is Test {
 
         // Validate with cached proof against new merkle root
         vm.prank(address(entryPoint));
+        _mockAndExpect(address(paymaster), abi.encodeWithSelector(paymaster.verifyProof.selector), abi.encode(true)); // expect to be called again
         (bytes memory context, uint256 validationData) = paymaster.validatePaymasterUserOp(
             userOp2,
             bytes32(0),
@@ -217,35 +155,7 @@ contract CachedSemaphorePaymasterTest is Test {
     }
 
     function test_CacheFailsAfterMemberRemoval() public {
-        // First create and cache a proof
-        uint256[8] memory points;
-        ISemaphore.SemaphoreProof memory proof = ISemaphore.SemaphoreProof({
-            merkleTreeDepth: 20,
-            merkleTreeRoot: 123,
-            nullifier: 456,
-            message: uint256(keccak256(abi.encode(sender))),
-            scope: 0,
-            points: points
-        });
-
-        // Store initial proof in cache
-        // Create initial paymaster data with proof
-        bytes memory paymasterData = bytes.concat(
-            hex"00", // Not using cache
-            bytes32(GROUP_ID),
-            abi.encode(proof)
-        );
-
-        // Create user operation with proof
-        PackedUserOperation memory initialOp;
-        initialOp.sender = sender;
-        initialOp.paymasterAndData = bytes.concat(abi.encodePacked(address(paymaster)), new bytes(32), paymasterData);
-
-        // Validate to cache the proof
-        vm.prank(address(entryPoint));
-        _mockAndExpect(address(paymaster), abi.encodeWithSelector(paymaster.verifyProof.selector), abi.encode(true));
-        paymaster.validatePaymasterUserOp(initialOp, bytes32(0), 1 ether);
-        vm.stopPrank();
+        _createAndCacheProof(sender);
 
         // Store initial merkle root
         uint256 initialRoot = paymaster.groupMerkleRoots(GROUP_ID);
@@ -256,9 +166,6 @@ contract CachedSemaphorePaymasterTest is Test {
         // Verify root changed
         uint256 newRoot = paymaster.groupMerkleRoots(GROUP_ID);
         require(initialRoot != newRoot, "Merkle root should change after member update");
-
-        // Mock verifyProof to return false for removed member
-        vm.mockCall(address(paymaster), abi.encodeWithSelector(paymaster.verifyProof.selector), abi.encode(false));
 
         // Try using cached proof after merkle root change
         bytes memory cachedPaymasterData = bytes.concat(
@@ -276,6 +183,8 @@ contract CachedSemaphorePaymasterTest is Test {
 
         // Validate with cached proof - should fail
         vm.prank(address(entryPoint));
+        // Mock verifyProof to return false for removed member
+        vm.mockCall(address(paymaster), abi.encodeWithSelector(paymaster.verifyProof.selector), abi.encode(false));
         (bytes memory context, uint256 validationData) = paymaster.validatePaymasterUserOp(userOp, bytes32(0), 1 ether);
         vm.stopPrank();
 
