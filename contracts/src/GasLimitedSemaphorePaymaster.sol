@@ -152,4 +152,14 @@ contract GasLimitedSemaphorePaymaster is SimpleSemaphorePaymaster {
     function updateEpoch() public {
         currentEpoch = (block.timestamp - firstEpochTimestamp) / epochDuration;
     }
+
+    /**
+     * @notice Sets the maximum gas per user per epoch for a group
+     * @param groupId The ID of the group
+     * @param maxGas The maximum gas per user per epoch
+     * @dev Can only be called by the group admin
+     */
+    function setMaxGasPerUserPerEpoch(uint256 groupId, uint256 maxGas) external onlyGroupAdmin(groupId) {
+        maxGasPerUserPerEpoch[groupId] = maxGas;
+    }
 }

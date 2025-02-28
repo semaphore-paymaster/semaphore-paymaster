@@ -29,11 +29,6 @@ contract TestGasLimitedSemaphorePaymaster is GasLimitedSemaphorePaymaster {
         currentEpoch = 0;
     }
 
-    // Helper function to set max gas per user per epoch
-    function setMaxGasPerUserPerEpoch(uint256 groupId, uint256 maxGas) external {
-        maxGasPerUserPerEpoch[groupId] = maxGas;
-    }
-
     // Helper function to manually set gas data for testing
     function setGasData(uint256 nullifier, uint256 _gasUsed, uint256 _lastMerkleRoot, uint256 _epoch) external {
         // Set the values directly

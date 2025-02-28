@@ -43,7 +43,7 @@ export async function setupSimpleAccount(entryPointAddress: string) {
     );
 }
 
-export async function setupSemaphoreContracts(entryPointAddress: string, useCached: boolean = false) {
+export async function setupSemaphoreContracts(entryPointAddress: string, contractName: string) {
     const poseidonT3Factory = await ethers.getContractFactory("PoseidonT3");
     const poseidonT3 = await poseidonT3Factory.deploy();
     await poseidonT3.waitForDeployment();
@@ -52,7 +52,6 @@ export async function setupSemaphoreContracts(entryPointAddress: string, useCach
     const verifierContract = await verifierFactory.deploy();
     await verifierContract.waitForDeployment();
 
-    const contractName = useCached ? "CachedSemaphorePaymaster" : "SimpleSemaphorePaymaster";
     const paymasterFactory = await ethers.getContractFactory(
         contractName,
         {

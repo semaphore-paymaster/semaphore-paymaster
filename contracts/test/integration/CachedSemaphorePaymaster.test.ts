@@ -145,7 +145,7 @@ describe("CachedSemaphorePaymasterTest", () => {
 
     // Deploy Semaphore contracts with cached version
     log("\n🔧 Deploying Cached Semaphore Contracts:");
-    cachedSemaphorePaymaster = (await setupSemaphoreContracts(entryPointAddress, true)) as CachedSemaphorePaymaster;
+    cachedSemaphorePaymaster = (await setupSemaphoreContracts(entryPointAddress, "CachedSemaphorePaymaster")) as unknown as CachedSemaphorePaymaster;
 
     // Setup group and deposits
     await cachedSemaphorePaymaster["createGroup()"]();

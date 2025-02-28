@@ -145,7 +145,7 @@ describe("SimplePaymasterTest", () => {
 
     // Deploy Semaphore contracts
     log("\n🔧 Deploying Semaphore Contracts:");
-    simpleSemaphorePaymaster = await setupSemaphoreContracts(entryPointAddress);
+    simpleSemaphorePaymaster = (await setupSemaphoreContracts(entryPointAddress, "SimpleSemaphorePaymaster")) as unknown as SimpleSemaphorePaymaster;
 
     // Setup group and deposits
     await simpleSemaphorePaymaster["createGroup()"]();
