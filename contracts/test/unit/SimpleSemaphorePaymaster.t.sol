@@ -80,7 +80,11 @@ contract SimpleSemaphorePaymasterTest is Test {
 
         // Validate - must be called from entrypoint
         vm.prank(address(entryPoint));
-        _mockAndExpect(address(paymaster), abi.encodeWithSelector(paymaster.verifyProof.selector), abi.encode(true));
+        _mockAndExpect(
+            address(paymaster),
+            abi.encodeWithSelector(paymaster.verifyProof.selector, GROUP_ID, proof),
+            abi.encode(true)
+        );
         (bytes memory context, uint256 validationData) = paymaster.validatePaymasterUserOp(userOp, bytes32(0), 1 ether);
         vm.stopPrank();
 

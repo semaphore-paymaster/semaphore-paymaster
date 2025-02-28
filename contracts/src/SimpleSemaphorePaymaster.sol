@@ -60,7 +60,7 @@ contract SimpleSemaphorePaymaster is BasePaymaster, Semaphore {
         PackedUserOperation calldata userOp,
         bytes32 /*userOpHash*/,
         uint256 requiredPreFund
-    ) internal view override returns (bytes memory context, uint256 validationData) {
+    ) internal virtual override returns (bytes memory context, uint256 validationData) {
         // Extract and decode the paymaster data
         PaymasterData memory data = abi.decode(userOp.paymasterAndData[52:], (PaymasterData));
 
@@ -93,7 +93,7 @@ contract SimpleSemaphorePaymaster is BasePaymaster, Semaphore {
         bytes calldata context,
         uint256 actualGasCost,
         uint256 /*actualUserOpFeePerGas*/
-    ) internal override {
+    ) internal virtual override {
         uint256 groupId = abi.decode(context, (uint256));
         // Deduct actual gas cost from group balance
         groupDeposits[groupId] -= actualGasCost;

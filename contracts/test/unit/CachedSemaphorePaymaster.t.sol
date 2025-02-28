@@ -73,7 +73,11 @@ contract CachedSemaphorePaymasterTest is Test {
 
         // Validate to cache the proof
         vm.prank(address(entryPoint));
-        _mockAndExpect(address(paymaster), abi.encodeWithSelector(paymaster.verifyProof.selector), abi.encode(true));
+        _mockAndExpect(
+            address(paymaster),
+            abi.encodeWithSelector(paymaster.verifyProof.selector, GROUP_ID, proof),
+            abi.encode(true)
+        );
         paymaster.validatePaymasterUserOp(userOp, bytes32(0), 1 ether);
         vm.stopPrank();
     }
