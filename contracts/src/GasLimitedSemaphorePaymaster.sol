@@ -61,8 +61,7 @@ contract GasLimitedSemaphorePaymaster is SimpleSemaphorePaymaster {
         uint256 _epochDuration,
         uint256 _firstEpochTimestamp
     ) SimpleSemaphorePaymaster(_entryPoint, _verifier) {
-        // Initialize epoch parameters
-        epochDuration = _epochDuration; // Default epoch duration is 1 day
+        epochDuration = _epochDuration;
         firstEpochTimestamp = _firstEpochTimestamp;
         currentEpoch = 0;
     }
