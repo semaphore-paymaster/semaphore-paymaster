@@ -51,8 +51,18 @@ contract GasLimitedSemaphorePaymaster is SimpleSemaphorePaymaster {
      * @notice Constructs the paymaster with required parameters
      * @param _entryPoint The EntryPoint contract address
      * @param _verifier The Semaphore verifier contract address
+     * @param _epochDuration The duration of an epoch in seconds
      */
-    constructor(address _entryPoint, address _verifier) SimpleSemaphorePaymaster(_entryPoint, _verifier) {}
+    constructor(
+        address _entryPoint,
+        address _verifier,
+        uint256 _epochDuration
+    ) SimpleSemaphorePaymaster(_entryPoint, _verifier) {
+        // Initialize epoch parameters
+        epochDuration = _epochDuration; // Default epoch duration is 1 day
+        firstEpochTimestamp = block.timestamp;
+        currentEpoch = 0;
+    }
 
     /**
      * @notice Validates a user operation by verifying a Semaphore proof

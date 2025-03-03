@@ -43,7 +43,11 @@ export async function setupSimpleAccount(entryPointAddress: string) {
     );
 }
 
-export async function setupSemaphoreContracts(entryPointAddress: string, contractName: string) {
+export async function setupSemaphoreContracts(entryPointAddress: string, contractName: string, epochDuration: number | undefined = undefined) {
+    if (contractName === "GasLimitedSemaphorePaymaster" && !epochDuration) {
+        throw new Error("Epoch duration is required for GasLimitedSemaphorePaymaster");
+    }
+
     const poseidonT3Factory = await ethers.getContractFactory("PoseidonT3");
     const poseidonT3 = await poseidonT3Factory.deploy();
     await poseidonT3.waitForDeployment();
@@ -60,6 +64,15 @@ export async function setupSemaphoreContracts(entryPointAddress: string, contrac
             }
         }
     );
+
+    if (contractName === "GasLimitedSemaphorePaymaster") {
+        return await paymasterFactory.deploy(
+            entryPointAddress,
+            await verifierContract.getAddress(),
+            epochDuration
+        );
+    }
+
     return await paymasterFactory.deploy(
         entryPointAddress,
         await verifierContract.getAddress()
@@ -115,6 +128,40 @@ export async function generateCachedPaymasterData(
     ]);
 }
 
+export async function generateGasLimitedPaymasterData(
+    id: Identity,
+    group: Group,
+    message: bigint,
+    groupId: number,
+    useCache: boolean = false
+) {
+    const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+
+    if (useCache) {
+        // For gas-limited paymaster, we need to include the nullifier in the cached format
+        // First generate a proof to get the nullifier
+        const proof = await generateProof(id, group, message, groupId);
+
+        // Return cached format with flag and nullifier
+        return ethers.concat([
+            "0x01", // Using cache flag
+            abiCoder.encode(["uint256"], [groupId]),
+            abiCoder.encode(["uint256"], [proof.nullifier])
+        ]);
+    }
+
+    // Generate new proof format
+    const proof = await generateProof(id, group, message, groupId);
+    return ethers.concat([
+        "0x00", // Not using cache flag
+        abiCoder.encode(["uint256"], [groupId]),
+        abiCoder.encode(
+            ["tuple(uint256 merkleTreeDepth, uint256 merkleTreeRoot, uint256 nullifier, uint256 message, uint256 scope, uint256[8] points)"],
+            [proof]
+        )
+    ]);
+}
+
 export function prepareTransferCallData(to: string, amount: bigint): string {
     const executeFunctionSelector = "0x" + ethers.id("execute(address,uint256,bytes)").slice(2, 10);
     return executeFunctionSelector + ethers.AbiCoder.defaultAbiCoder().encode(
@@ -145,7 +192,12 @@ export async function prepareUserOp(
 
 async function signUserOp(context: TestContext, unsignedUserOperation: any) {
     const chainId = await context.provider.getNetwork().then((network) => network.chainId);
-    getUserOpHash(unsignedUserOperation, context.entryPointAddress, Number(chainId));
-    unsignedUserOperation.signature = "0x";
+    const userOpHash = getUserOpHash(unsignedUserOperation, context.entryPointAddress, Number(chainId));
+
+    // For testing purposes, we're using a dummy signature
+    // In a real application, this would be signed by the user's private key
+    // The SimpleAccount contract in test mode accepts any signature
+    unsignedUserOperation.signature = "0xfffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c";
+
     return unsignedUserOperation;
 } 
