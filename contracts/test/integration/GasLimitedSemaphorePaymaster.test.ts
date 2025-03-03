@@ -148,7 +148,9 @@ describe("GasLimitedSemaphorePaymasterTest", () => {
 
         // Deploy Semaphore contracts with gas limited version
         log("\n🔧 Deploying Gas Limited Semaphore Contracts:");
-        const paymasterContract = await setupSemaphoreContracts(entryPointAddress, "GasLimitedSemaphorePaymaster", epochDuration);
+        const currentTimestamp = await context.provider.getBlock('latest').then(block => block!.timestamp);
+        log("  └─ Current timestamp:", currentTimestamp);
+        const paymasterContract = await setupSemaphoreContracts(entryPointAddress, "GasLimitedSemaphorePaymaster", epochDuration, currentTimestamp);
         gasLimitedSemaphorePaymaster = paymasterContract as unknown as GasLimitedSemaphorePaymaster;
 
         // Setup epoch parameters

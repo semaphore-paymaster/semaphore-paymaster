@@ -43,9 +43,13 @@ export async function setupSimpleAccount(entryPointAddress: string) {
     );
 }
 
-export async function setupSemaphoreContracts(entryPointAddress: string, contractName: string, epochDuration: number | undefined = undefined) {
+export async function setupSemaphoreContracts(entryPointAddress: string, contractName: string, epochDuration: number | undefined = undefined, firstEpochTimestamp: number | undefined = undefined) {
     if (contractName === "GasLimitedSemaphorePaymaster" && !epochDuration) {
         throw new Error("Epoch duration is required for GasLimitedSemaphorePaymaster");
+    }
+
+    if (contractName === "GasLimitedSemaphorePaymaster" && !firstEpochTimestamp) {
+        throw new Error("First epoch timestamp is required for GasLimitedSemaphorePaymaster");
     }
 
     const poseidonT3Factory = await ethers.getContractFactory("PoseidonT3");
@@ -66,10 +70,12 @@ export async function setupSemaphoreContracts(entryPointAddress: string, contrac
     );
 
     if (contractName === "GasLimitedSemaphorePaymaster") {
+
         return await paymasterFactory.deploy(
             entryPointAddress,
             await verifierContract.getAddress(),
-            epochDuration
+            epochDuration,
+            firstEpochTimestamp
         );
     }
 

@@ -21,8 +21,9 @@ contract TestGasLimitedSemaphorePaymaster is GasLimitedSemaphorePaymaster {
     constructor(
         address _entryPoint,
         address _verifier,
-        uint256 _epochDuration
-    ) GasLimitedSemaphorePaymaster(_entryPoint, _verifier, _epochDuration) {}
+        uint256 _epochDuration,
+        uint256 _firstEpochTimestamp
+    ) GasLimitedSemaphorePaymaster(_entryPoint, _verifier, _epochDuration, _firstEpochTimestamp) {}
 
     // Helper function to manually set gas data for testing
     function setGasData(uint256 nullifier, uint256 _gasUsed, uint256 _lastMerkleRoot, uint256 _epoch) external {
@@ -56,7 +57,12 @@ contract GasLimitedSemaphorePaymasterTest is Test {
         verifier = new AlwaysValidVerifier();
 
         // Deploy paymaster with epoch parameters
-        paymaster = new TestGasLimitedSemaphorePaymaster(entryPoint, address(verifier), EPOCH_DURATION);
+        paymaster = new TestGasLimitedSemaphorePaymaster(
+            entryPoint,
+            address(verifier),
+            EPOCH_DURATION,
+            block.timestamp
+        );
 
         // Create group and fund it
         paymaster.createGroup();
@@ -100,7 +106,8 @@ contract GasLimitedSemaphorePaymasterTest is Test {
         TestGasLimitedSemaphorePaymaster newPaymaster = new TestGasLimitedSemaphorePaymaster(
             entryPoint,
             address(verifier),
-            newEpochDuration
+            newEpochDuration,
+            block.timestamp
         );
 
         // Current epoch should be 0 initially

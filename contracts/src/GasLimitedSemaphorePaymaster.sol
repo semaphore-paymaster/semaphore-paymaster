@@ -52,15 +52,18 @@ contract GasLimitedSemaphorePaymaster is SimpleSemaphorePaymaster {
      * @param _entryPoint The EntryPoint contract address
      * @param _verifier The Semaphore verifier contract address
      * @param _epochDuration The duration of an epoch in seconds
+     * @param _firstEpochTimestamp The timestamp of the first epoch
+     * @dev max gas limit can be set for each group by the group admin
      */
     constructor(
         address _entryPoint,
         address _verifier,
-        uint256 _epochDuration
+        uint256 _epochDuration,
+        uint256 _firstEpochTimestamp
     ) SimpleSemaphorePaymaster(_entryPoint, _verifier) {
         // Initialize epoch parameters
         epochDuration = _epochDuration; // Default epoch duration is 1 day
-        firstEpochTimestamp = block.timestamp;
+        firstEpochTimestamp = _firstEpochTimestamp;
         currentEpoch = 0;
     }
 
