@@ -133,33 +133,41 @@ export async function generateGasLimitedPaymasterData(
     group: Group,
     message: bigint,
     groupId: number,
+    epoch: number,
     useCache: boolean = false
-) {
+): Promise<{ paymasterData: string, nullifier: string }> {
     const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+    let scope = ethers.keccak256(abiCoder.encode(["uint256", "uint256"], [groupId, epoch]));
 
     if (useCache) {
         // For gas-limited paymaster, we need to include the nullifier in the cached format
         // First generate a proof to get the nullifier
-        const proof = await generateProof(id, group, message, groupId);
+        const proof = await generateProof(id, group, message, scope);
 
         // Return cached format with flag and nullifier
-        return ethers.concat([
-            "0x01", // Using cache flag
-            abiCoder.encode(["uint256"], [groupId]),
-            abiCoder.encode(["uint256"], [proof.nullifier])
-        ]);
+        return {
+            paymasterData: ethers.concat([
+                "0x01", // Using cache flag
+                abiCoder.encode(["uint256"], [groupId]),
+                abiCoder.encode(["uint256"], [proof.nullifier])
+            ]),
+            nullifier: proof.nullifier
+        };
     }
 
     // Generate new proof format
-    const proof = await generateProof(id, group, message, groupId);
-    return ethers.concat([
-        "0x00", // Not using cache flag
-        abiCoder.encode(["uint256"], [groupId]),
-        abiCoder.encode(
-            ["tuple(uint256 merkleTreeDepth, uint256 merkleTreeRoot, uint256 nullifier, uint256 message, uint256 scope, uint256[8] points)"],
-            [proof]
-        )
-    ]);
+    const proof = await generateProof(id, group, message, scope);
+    return {
+        paymasterData: ethers.concat([
+            "0x00", // Not using cache flag
+            abiCoder.encode(["uint256"], [groupId]),
+            abiCoder.encode(
+                ["tuple(uint256 merkleTreeDepth, uint256 merkleTreeRoot, uint256 nullifier, uint256 message, uint256 scope, uint256[8] points)"],
+                [proof]
+            )
+        ]),
+        nullifier: proof.nullifier
+    };
 }
 
 export function prepareTransferCallData(to: string, amount: bigint): string {

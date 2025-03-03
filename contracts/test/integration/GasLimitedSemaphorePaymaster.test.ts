@@ -176,9 +176,163 @@ describe("GasLimitedSemaphorePaymasterTest", () => {
 
     it("should execute a simple ETH transfer with new proof", async () => {
         const message = await generateMessage(simpleAccount)
-        const paymasterData = await generateGasLimitedPaymasterData(id1, group, message, groupId, false)
+        const epoch = await gasLimitedSemaphorePaymaster.currentEpoch()
+        const paymasterData = await generateGasLimitedPaymasterData(id1, group, message, groupId, epoch, false)
         log("  └─ Paymaster Data:", paymasterData)
-        await assertSendEth(transferAmount, paymasterData);
+        await assertSendEth(transferAmount, paymasterData.paymasterData);
     });
 
+    it("should execute a transfer with cached proof", async () => {
+        // First execute with new proof to cache it
+        const message = await generateMessage(simpleAccount)
+        const epoch = await gasLimitedSemaphorePaymaster.currentEpoch()
+        const newProofData = await generateGasLimitedPaymasterData(id1, group, message, groupId, epoch, false)
+        await assertSendEth(transferAmount, newProofData.paymasterData);
+
+        // Then execute using cached proof
+        const cachedProofData = await generateGasLimitedPaymasterData(id1, group, message, groupId, epoch, true)
+        log("  └─ Cached Paymaster Data:", cachedProofData)
+        await assertSendEth(transferAmount, cachedProofData.paymasterData);
+    });
+
+    it("should track gas usage across multiple operations", async () => {
+        const message = await generateMessage(simpleAccount)
+        const epoch = await gasLimitedSemaphorePaymaster.currentEpoch()
+        const paymasterData = await generateGasLimitedPaymasterData(id1, group, message, groupId, epoch, false)
+
+        // Execute multiple transactions to accumulate gas usage
+        for (let i = 0; i < 3; i++) {
+            log(`\n📝 Executing transaction ${i + 1}`)
+            await assertSendEth(transferAmount, paymasterData.paymasterData);
+        }
+
+        // The transactions should succeed since they're under the gas limit
+    });
+
+    it("should reject operations when gas limit is exceeded", async () => {
+        const message = await generateMessage(simpleAccount)
+        const epoch = await gasLimitedSemaphorePaymaster.currentEpoch()
+        const paymasterData = await generateGasLimitedPaymasterData(id1, group, message, groupId, epoch, false)
+
+        // First transaction to measure gas usage
+        await assertSendEth(transferAmount, paymasterData.paymasterData);
+
+        // Get gas used from first transaction
+        const gasUsedFirstTx = (await gasLimitedSemaphorePaymaster.gasData(paymasterData.nullifier)).gasUsed;
+        log("  └─ Gas used in first tx:", ethers.formatEther(gasUsedFirstTx), "ETH");
+
+        // max out the gas limit
+        const gasLimit = gasUsedFirstTx;
+        await gasLimitedSemaphorePaymaster.setMaxGasPerUserPerEpoch(groupId, gasLimit);
+        log("  └─ Set gas limit to", ethers.formatEther(gasLimit), "ETH");
+
+        // Second transaction should fail due to gas limit
+        await assertSendEth(transferAmount, paymasterData.paymasterData, false);
+
+        // Reset gas limit for other tests
+        await gasLimitedSemaphorePaymaster.setMaxGasPerUserPerEpoch(groupId, ethers.parseEther("5"));
+    });
+
+    it("should allow operations from different users within the same epoch", async () => {
+        const message1 = await generateMessage(simpleAccount)
+        const epoch = await gasLimitedSemaphorePaymaster.currentEpoch()
+        const paymasterData1 = await generateGasLimitedPaymasterData(id1, group, message1, groupId, epoch, false)
+
+        const message2 = await generateMessage(simpleAccount)
+        const paymasterData2 = await generateGasLimitedPaymasterData(id2, group, message2, groupId, epoch, false)
+
+        // Both users should be able to execute transactions
+        await assertSendEth(transferAmount, paymasterData1.paymasterData);
+        await assertSendEth(transferAmount, paymasterData2.paymasterData);
+    });
+
+    it("should reset gas usage after epoch change", async () => {
+        const message = await generateMessage(simpleAccount)
+        let epoch = await gasLimitedSemaphorePaymaster.currentEpoch()
+        const paymasterData = await generateGasLimitedPaymasterData(id1, group, message, groupId, epoch, false)
+
+        // Use most of the gas limit
+        await assertSendEth(ethers.parseEther("0.005"), paymasterData.paymasterData);
+
+        // Check gas usage before epoch change
+        const gasUsedBeforeEpochChange = (await gasLimitedSemaphorePaymaster.gasData(paymasterData.nullifier)).gasUsed;
+        log("  └─ Gas used before epoch change:", ethers.formatEther(gasUsedBeforeEpochChange), "ETH");
+        expect(gasUsedBeforeEpochChange).to.be.gt(0, "Gas usage should be recorded for the transaction");
+
+        // Mine enough blocks to advance time past the epoch duration
+        // For Geth, we need to mine multiple blocks to advance time
+        for (let i = 0; i < epochDuration; i++) {
+            await context.provider.send("eth_sendTransaction", [
+                {
+                    from: await context.admin.getAddress(),
+                    to: await context.admin.getAddress(),
+                    value: "0x1"
+                }
+            ]);
+        }
+
+        // Update epoch
+        await gasLimitedSemaphorePaymaster.updateEpoch();
+
+        // Generate new proof for new epoch
+        const newMessage = await generateMessage(simpleAccount)
+        epoch = await gasLimitedSemaphorePaymaster.currentEpoch()
+        const newProofData = await generateGasLimitedPaymasterData(id1, group, newMessage, groupId, epoch, false)
+
+        // Check gas usage after epoch change
+        const gasUsedAfterEpochChange = (await gasLimitedSemaphorePaymaster.gasData(newProofData.nullifier)).gasUsed;
+        log("  └─ Gas used after epoch change:", ethers.formatEther(gasUsedAfterEpochChange), "ETH");
+        expect(gasUsedAfterEpochChange).to.equal(0, "Gas usage should be reset after epoch change");
+
+        // Should be able to send again since gas limit resets in new epoch
+        await assertSendEth(ethers.parseEther("0.005"), newProofData.paymasterData);
+
+        // Reset the gas limit for other tests
+        await gasLimitedSemaphorePaymaster.setMaxGasPerUserPerEpoch(groupId, ethers.parseEther("5"));
+    });
+
+    it("should reject cached proof after merkle root change", async () => {
+        // First execute with new proof to cache it
+        const message = await generateMessage(simpleAccount)
+        const epoch = await gasLimitedSemaphorePaymaster.currentEpoch()
+        const newProofData = await generateGasLimitedPaymasterData(id1, group, message, groupId, epoch, false)
+        await assertSendEth(transferAmount, newProofData.paymasterData);
+
+        // Change merkle root by adding a new member
+        const newCommitment = BigInt("123456789");
+        await gasLimitedSemaphorePaymaster.addMember(groupId, newCommitment);
+        log("  └─ Added new member to change merkle root");
+
+        const cachedProofData = await generateGasLimitedPaymasterData(id1, group, message, groupId, epoch, true)
+        await assertSendEth(transferAmount, cachedProofData.paymasterData, false);
+    });
+
+    it("should reject cached proof after epoch change", async () => {
+        // First execute with new proof to cache it
+        const message = await generateMessage(simpleAccount)
+        let epoch = await gasLimitedSemaphorePaymaster.currentEpoch()
+        const newProofData = await generateGasLimitedPaymasterData(id1, group, message, groupId, epoch, false)
+        await assertSendEth(transferAmount, newProofData.paymasterData);
+
+        // Mine enough blocks to advance time past the epoch duration
+        // For Geth, we need to mine multiple blocks to advance time
+        for (let i = 0; i < epochDuration; i++) {
+            await context.provider.send("eth_sendTransaction", [
+                {
+                    from: await context.admin.getAddress(),
+                    to: await context.admin.getAddress(),
+                    value: "0x1"
+                }
+            ]);
+        }
+
+        // Update epoch
+        await gasLimitedSemaphorePaymaster.updateEpoch();
+        log("  └─ Advanced to new epoch:", await gasLimitedSemaphorePaymaster.currentEpoch());
+
+        // Try to use cached proof after epoch change
+        epoch = await gasLimitedSemaphorePaymaster.currentEpoch()
+        const cachedProofData = await generateGasLimitedPaymasterData(id1, group, message, groupId, epoch, true)
+        await assertSendEth(transferAmount, cachedProofData.paymasterData, false);
+    });
 }); 

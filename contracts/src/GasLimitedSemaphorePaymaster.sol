@@ -117,8 +117,11 @@ contract GasLimitedSemaphorePaymaster is SimpleSemaphorePaymaster {
                 (ISemaphore.SemaphoreProof)
             );
 
-            proof.message = uint256(uint160(userOp.sender));
-            proof.scope = uint256(keccak256(abi.encode(groupId, currentEpoch)));
+            uint256 expectedMessage = uint256(uint160(userOp.sender));
+            uint256 expectedScope = uint256(keccak256(abi.encode(groupId, currentEpoch)));
+            if (proof.message != expectedMessage || proof.scope != expectedScope) {
+                return ("", _packValidationData(true, 0, 0));
+            }
 
             if (!this.verifyProof(groupId, proof)) {
                 return ("", _packValidationData(true, 0, 0));

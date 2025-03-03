@@ -22,12 +22,7 @@ contract TestGasLimitedSemaphorePaymaster is GasLimitedSemaphorePaymaster {
         address _entryPoint,
         address _verifier,
         uint256 _epochDuration
-    ) GasLimitedSemaphorePaymaster(_entryPoint, _verifier) {
-        // Initialize epoch parameters
-        epochDuration = _epochDuration;
-        firstEpochTimestamp = block.timestamp;
-        currentEpoch = 0;
-    }
+    ) GasLimitedSemaphorePaymaster(_entryPoint, _verifier, _epochDuration) {}
 
     // Helper function to manually set gas data for testing
     function setGasData(uint256 nullifier, uint256 _gasUsed, uint256 _lastMerkleRoot, uint256 _epoch) external {
