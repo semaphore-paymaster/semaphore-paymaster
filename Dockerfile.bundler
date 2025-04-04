@@ -5,7 +5,7 @@ FROM node:18
 WORKDIR /app/bundler
 
 # Clone the bundler repository
-RUN git clone https://github.com/eth-infinitism/bundler.git .
+RUN git clone https://github.com/eth-infinitism/bundler.git . && git checkout 09b1141da84a6fb726ef883a9070f4e8933ff82a
 
 # Install dependencies
 RUN yarn && yarn preprocess
