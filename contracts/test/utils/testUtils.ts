@@ -1,9 +1,9 @@
 import { ethers } from "hardhat";
 import { JsonRpcProvider, Signer } from "ethers";
-import { SimpleAccount, SimpleSemaphorePaymaster } from "../../typechain";
+import { SemaphorePolicy, SemaphorePolicy__factory, SimpleAccount, SemaphorePolicyFactory, SemaphorePolicyFactory__factory } from "../../typechain";
 import { Identity, Group, generateProof } from "@semaphore-protocol/core";
 import { generateUnsignedUserOp, getUserOpHash } from "./userOpUtils";
-import sendUserOpAndWait from "./userOpUtils";
+import { SemaphoreChecker, SemaphoreChecker__factory, SemaphoreCheckerFactory, SemaphoreCheckerFactory__factory, SemaphoreMock, SemaphoreMock__factory } from "@excubiae/contracts/typechain-types";
 
 export interface TestContext {
     bundlerProvider: JsonRpcProvider;
@@ -85,11 +85,127 @@ export async function setupSemaphoreContracts(entryPointAddress: string, contrac
     );
 }
 
+export async function setupExcubiaeSemaphorePaymasterContracts(entryPointAddress: string, simpleAccountAddress: string, owner: Signer) {
+    // Deploy Semaphore
+    const validGroupId = 0
+    const invalidGroupId = 1
+    const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+    const validProof = {
+        merkleTreeDepth: 1n,
+        merkleTreeRoot: 0n,
+        nullifier: 0n,
+        message: BigInt(simpleAccountAddress),
+        scope: generateScope(entryPointAddress, validGroupId),
+        points: [0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n]
+    }
+    const invalidProof = {
+        merkleTreeDepth: 1n,
+        merkleTreeRoot: 0n,
+        nullifier: 1n,
+        message: BigInt(simpleAccountAddress),
+        scope: generateScope(entryPointAddress, invalidGroupId),
+        points: [0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n]
+    }
+    const validEvidence = abiCoder.encode(
+        ["uint256", "uint256", "uint256", "uint256", "uint256", "uint256[8]"],
+        [
+            validProof.merkleTreeDepth,
+            validProof.merkleTreeRoot,
+            validProof.nullifier,
+            validProof.message,
+            validProof.scope,
+            validProof.points
+        ]
+    )
+    const invalidEvidence = abiCoder.encode(
+        ["uint256", "uint256", "uint256", "uint256", "uint256", "uint256[8]"],
+        [
+            invalidProof.merkleTreeDepth,
+            invalidProof.merkleTreeRoot,
+            invalidProof.nullifier,
+            invalidProof.message,
+            invalidProof.scope,
+            invalidProof.points
+        ]
+    )
+
+    const groupIds = new Array(1)
+    const nullifiers = new Array(2)
+    const nullifiersValidities: boolean[] = new Array(2)
+
+    groupIds[0] = validGroupId
+    nullifiers[0] = validProof.nullifier
+    nullifiers[1] = invalidProof.nullifier
+    nullifiersValidities[0] = true
+    nullifiersValidities[1] = false
+
+    const semaphore: SemaphoreMock = await new SemaphoreMock__factory(owner).deploy(groupIds, nullifiers, nullifiersValidities);
+    await semaphore.waitForDeployment();
+
+    // Deploy SemaphoreChecker
+    const checkerFactory: SemaphoreCheckerFactory = await new SemaphoreCheckerFactory__factory(owner).deploy();
+    await checkerFactory.waitForDeployment();
+
+    const checkerTx = await checkerFactory.deploy(await semaphore.getAddress(), validGroupId);
+    const checkerReceipt = await checkerTx.wait();
+    const checkerEvent = checkerFactory.interface.parseLog(
+        checkerReceipt?.logs[0] as unknown as { topics: string[]; data: string }
+    ) as unknown as {
+        args: {
+            clone: string
+        }
+    }
+    const checker: SemaphoreChecker = SemaphoreChecker__factory.connect(checkerEvent.args.clone, owner);
+
+    // Deploy SemaphorePolicy    
+    const policyFactory: SemaphorePolicyFactory = await new SemaphorePolicyFactory__factory(owner).deploy();
+    await policyFactory.waitForDeployment();
+
+    const policyTx = await policyFactory.deploy(await checker.getAddress());
+    const policyReceipt = await policyTx.wait();
+    const policyEvent = policyFactory.interface.parseLog(
+        policyReceipt?.logs[0] as unknown as { topics: string[]; data: string }
+    ) as unknown as {
+        args: {
+            clone: string
+        }
+    }
+    const policy: SemaphorePolicy = SemaphorePolicy__factory.connect(policyEvent.args.clone, owner);
+    
+    // Deploy ExcubiaeSemaphorePaymaster
+    const paymasterFactory = await ethers.getContractFactory("ExcubiaeSemaphorePaymaster");
+    const paymaster = await paymasterFactory.deploy(entryPointAddress, await policy.getAddress())
+    await paymaster.waitForDeployment();
+
+    return {
+        semaphore,
+        policy,
+        paymaster,
+        validEvidence,
+        invalidEvidence
+    }
+}
+
 export async function generateMessage(account: SimpleAccount) {
     const sender = await account.getAddress();
     return BigInt(sender);
 }
 
+export function generateScope(entryPointAddress: string, groupId: number): bigint {
+    return (ethers.toBigInt(entryPointAddress) << 96n) | ethers.toBigInt(groupId)
+}
+
+export async function generateExcubiaePaymasterData(
+    groupId: number,
+    evidence: string
+) {
+    const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+
+    return abiCoder.encode(
+        ["tuple(uint256 groupId, bytes proof)"],
+        [{ groupId: groupId, proof: evidence }]
+    );
+}
 export async function generatePaymasterData(
     id: Identity,
     group: Group,
