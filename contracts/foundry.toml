@@ -4,6 +4,7 @@ out = "artifacts"
 libs = ["node_modules", "lib"]
 remappings = [
     "@account-abstraction/=node_modules/@account-abstraction/",
+    "@excubiae/contracts/=node_modules/@excubiae/contracts/",
     "@openzeppelin/=node_modules/@openzeppelin/",
     "@semaphore-protocol/=node_modules/@semaphore-protocol/",
     "@zk-kit/=node_modules/@zk-kit/",

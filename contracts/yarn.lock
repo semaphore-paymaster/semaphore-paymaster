@@ -401,6 +401,15 @@
     "@ethersproject/properties" "^5.7.0"
     "@ethersproject/strings" "^5.7.0"
 
+"@excubiae/contracts@^0.10.0":
+  version "0.10.0"
+  resolved "https://registry.yarnpkg.com/@excubiae/contracts/-/contracts-0.10.0.tgz#66ae8eec5040e57c93082fbd97bc487cc3788131"
+  integrity sha512-gHHpQRP0KDUfSa/a9v4EMZWVmcHytyUf5r87gp4hfeJwg1CNITJMYToghzFwPkQFAlpco6+aNqOzYR9PAS3I1A==
+  dependencies:
+    "@openzeppelin/contracts" "^5.2.0"
+    "@semaphore-protocol/contracts" "^4.9.0"
+    solady "0.1.4"
+
 "@fastify/busboy@^2.0.0":
   version "2.1.1"
   resolved "https://registry.npmjs.org/@fastify/busboy/-/busboy-2.1.1.tgz"
@@ -739,6 +748,11 @@
   resolved "https://registry.npmjs.org/@openzeppelin/contracts/-/contracts-5.0.2.tgz"
   integrity sha512-ytPc6eLGcHHnapAZ9S+5qsdomhjo6QBHTDRRBFfTxXIpsicMhVPouPgmUPebZZZGX7vt9USA+Z+0M0dSVtSUEA==
 
+"@openzeppelin/contracts@^5.2.0":
+  version "5.3.0"
+  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-5.3.0.tgz#0a90ce16f5c855e3c8239691f1722cd4999ae741"
+  integrity sha512-zj/KGoW7zxWUE8qOI++rUM18v+VeLTTzKs/DJFkSzHpQFPD/jKKF0TrMxBfGLl3kpdELCNccvB3zmofSzm4nlA==
+
 "@scure/base@~1.1.0", "@scure/base@~1.1.6":
   version "1.1.9"
   resolved "https://registry.npmjs.org/@scure/base/-/base-1.1.9.tgz"
@@ -784,6 +798,13 @@
   integrity sha512-iQ0TbhIzdFdhR4dM/uc+TMdl8jdBAP9oV62AmIdEs9o98TtnosU2fTsuQ9t/5y7qWtYm7mVuu7Pq41L12hVJNg==
   dependencies:
     "@zk-kit/lean-imt.sol" "2.0.0"
+
+"@semaphore-protocol/contracts@^4.9.0":
+  version "4.9.2"
+  resolved "https://registry.yarnpkg.com/@semaphore-protocol/contracts/-/contracts-4.9.2.tgz#49277a5de8ee847b11c09f29c663ba4c221d7a20"
+  integrity sha512-/DnZ9SOzBsfv06Vz74djVHEPgZwIkdNt7e5Ay2612Rw22EwToedQX5ahJxfG9vbgHleOZ1iAV4y+XKmDhPpDBg==
+  dependencies:
+    "@zk-kit/lean-imt.sol" "2.0.1"
 
 "@semaphore-protocol/core@4.8.2":
   version "4.8.2"
@@ -1138,6 +1159,13 @@
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/@zk-kit/lean-imt.sol/-/lean-imt.sol-2.0.0.tgz#4b0aee47854b5844455f9361396062139416e12b"
   integrity sha512-e9pAm+IXveLPy7b1h05ipIo6U44vp8g/2E+Ocx3PIloMu7lgTXFkIeZj/qZ/iLgEMsF74T0dsg7aVIT0B0nsDA==
+  dependencies:
+    poseidon-solidity "0.0.5"
+
+"@zk-kit/lean-imt.sol@2.0.1":
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/@zk-kit/lean-imt.sol/-/lean-imt.sol-2.0.1.tgz#23ffd37fc4bac95a1e18dc9d55132362532137ee"
+  integrity sha512-2dy/wfzch2vy5QtDCFmQwN7E4GZP0xBcucTb2mfZoJP5V69cjPRdy6KcbS0YOcBMH/Lb7BgXLsekRYjh9JNKEw==
   dependencies:
     poseidon-solidity "0.0.5"
 
@@ -3790,10 +3818,10 @@ snarkjs@0.7.4, snarkjs@^0.7.4:
     logplease "^1.2.15"
     r1csfile "0.0.48"
 
-solady@^0.0.123:
-  version "0.0.123"
-  resolved "https://registry.yarnpkg.com/solady/-/solady-0.0.123.tgz#7ef95767c1570e3efde7550da2a8b439b2f413d2"
-  integrity sha512-F/B8OMCplGsS4FrdPrnEG0xdg8HKede5PwC+Rum8soj/LWxfKckA0p+Uwnlbgey2iI82IHvmSOCNhsdbA+lUrw==
+solady@0.1.4:
+  version "0.1.4"
+  resolved "https://registry.yarnpkg.com/solady/-/solady-0.1.4.tgz#1f589be95789f356f44d49f1304baeeca6cf5549"
+  integrity sha512-BQKpX9Ezdp6WpUcT3H7cWdZKH31Ih7yZiUOQ6SUYzJ6gYjCB0KXPg77bS+pzmeQEtdMNK56gjlaqtn6ptFPSXQ==
 
 solc@0.8.26:
   version "0.8.26"
