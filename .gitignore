@@ -5,3 +5,5 @@ contracts/deployedAddresses.json
 
 .vscode
 .idea
+
+bun.lock
