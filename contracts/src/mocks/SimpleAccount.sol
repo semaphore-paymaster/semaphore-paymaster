@@ -33,7 +33,7 @@ contract SimpleAccount is BaseAccount {
     /// @param dest The destination address
     /// @param value The amount of ETH to send
     /// @param func The function data to execute
-    function execute(address dest, uint256 value, bytes calldata func) external override {
+    function execute(address dest, uint256 value, bytes calldata func) external {
         _requireFromEntryPoint();
         (bool success, bytes memory result) = dest.call{value: value}(func);
         if (!success) {
